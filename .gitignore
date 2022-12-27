@@ -1,1 +1,3 @@
 /.idea/
+/test1.php
+/modules/registrars/domainnameapi/cache/*.cache
