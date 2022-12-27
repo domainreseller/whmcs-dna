@@ -56,7 +56,7 @@ function domainnameapi_getConfigArray($params) {
         $configarray = [
             "FriendlyName" => [
                 "Type"  => "System",
-                "Value" => "Domain Name API - ICANN Accredited Domain Registrar from TURKEY"
+                "Value" => "DomainNameAPI"
             ],
             "Description"  => [
                 "Type"  => "System",
