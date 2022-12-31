@@ -56,15 +56,6 @@
 Daha fazla bilgi için : <a href="https://docs.whmcs.com/Domain_Pricing">Whmcs Domain Fiyatlama</a>
 <hr>
 
-## Yönetici Gözünden
-<a href="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"><img width="400"  alt="image" src="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"></a>
-
-- Alan adı için "Silme isteği" gönderebilirsiniz.
-- Alan adı için "Transfer İptali" gönderebilirsiniz.
-- Alan adının Canlı durumunu , anlık başlangıç ve bitişini görebilirsiniz
-- Subnslerini listeleyebilirsiniz
-- Ek alan bilgilerini görüntüleyebilirsiniz
-
 ## Toplu Fiyat Belirleme && Otomaik Fiyatlandırma
 
 <a href="https://user-images.githubusercontent.com/3975986/209730191-0b796b2f-7f90-4dba-9a17-8ed2e11e11b8.png"><img width="400"  alt="image" src="https://user-images.githubusercontent.com/3975986/209730191-0b796b2f-7f90-4dba-9a17-8ed2e11e11b8.png"></a>
@@ -75,6 +66,16 @@ Daha fazla bilgi için : <a href="https://docs.whmcs.com/Domain_Pricing">Whmcs D
 - gelecek olan ekranda sistemimizde olan tüm tldler whmcs üzerindeki olan-olmayan tüm tldlerle çapraz karşılaştırılır, kar marjı ve zararı hesaplanarak toplu halde gösterilir ve içe aktarıma imkan tanır.
 Daha fazla bilgi için : <a href="https://docs.whmcs.com/Registrar_TLD_Sync">Whmcs TLD Senkronizasyonu</a>
 
+<hr>
+
+## Yönetici Gözünden
+<a href="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"><img width="400"  alt="image" src="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"></a>
+
+- Alan adı için "Silme isteği" gönderebilirsiniz.
+- Alan adı için "Transfer İptali" gönderebilirsiniz.
+- Alan adının Canlı durumunu , anlık başlangıç ve bitişini görebilirsiniz
+- Subnslerini listeleyebilirsiniz
+- Ek alan bilgilerini görüntüleyebilirsiniz
 <hr>
 
 ## Genel Ayarlar
