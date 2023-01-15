@@ -11,19 +11,14 @@ namespace DomainNameApi;
 
 class DomainNameAPI_PHPLibrary {
 
-    public  $_VERSION_          = "1.3";
     private $_USERDATA_USERNAME = "ownername";
     private $_USERDATA_PASSWORD = "ownerpass";
-    private $_URL_SERVICE       = "https://wcf-gbs-trabis.domainnameapi.com/DomainApi.svc";
-    private $con                = null;
-    private $_useTestMode       = true;
-    private $_useCaching        = false;
-    private $_cache             = array();
-    private $service            = null;
+    private $_URL_SERVICE       = "https://whmcs.domainnameapi.com/DomainApi.svc";
+    private $service;
 
 
-    public $__REQUEST  = array();
-    public $__RESPONSE = array();
+    public $__REQUEST  = [];
+    public $__RESPONSE = [];
 
 
     public function __construct($UserName = "ownername", $Password = "ownerpass", $TestMode = false) {
@@ -32,13 +27,13 @@ class DomainNameAPI_PHPLibrary {
         self::useTestMode($TestMode);
 
         // Create unique connection
-        $this->service = new \SoapClient($this->_URL_SERVICE . "?singlewsdl", array(
-            'trace'    => true,
-            "encoding" => "UTF-8",
-            'features' => SOAP_SINGLE_ELEMENT_ARRAYS,
-            'debug' => true,
-            'exceptions' =>true,
-        ));
+        $this->service = new \SoapClient($this->_URL_SERVICE . "?singlewsdl", [
+            'trace'      => true,
+            "encoding"   => "UTF-8",
+            'features'   => SOAP_SINGLE_ELEMENT_ARRAYS,
+            'debug'      => true,
+            'exceptions' => true,
+        ]);
 
     }
 
@@ -48,10 +43,9 @@ class DomainNameAPI_PHPLibrary {
     // USE TEST PLATFORM OR REAL PLATFORM
     // if value equals false, use real platform, otherwise use test platform
     private function useTestMode($value = true) {
-        if ($value !== true) {
-            // REAL MODE
-            //$this->_useTestMode = false;
-            $this->_URL_SERVICE = "https://wcf-gbs-trabis.domainnameapi.com/DomainApi.svc";
+        if ($value === true) {
+            $this->_USERDATA_USERNAME = 'test1.dna@apiname.com';
+            $this->_USERDATA_PASSWORD = 'FsUvpJMzQ69scpqE';
         }
 
         //$this->con = new APIConnection_SOAP($this->_URL_SERVICE);
@@ -79,13 +73,13 @@ class DomainNameAPI_PHPLibrary {
 
     // API METHODS
     public function GetResellerDetails() {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"       => $this->_USERDATA_PASSWORD,
                 "UserName"       => $this->_USERDATA_USERNAME,
                 'CurrencyId'=>2
-            )
-        );
+            ]
+        ];
 
 
         //self::setRequestData($parameters);
@@ -117,7 +111,7 @@ class DomainNameAPI_PHPLibrary {
                 $resp['symbol']   = $active_currency['CurrencySymbol'];
             } else {
                 $resp['result'] = 'ERROR';
-                $resp['error'] = $this->setError("INVALID_CREDINENTIALS", "Invalid response received from server!", "invalid username and password");;
+                $resp['error'] = $this->setError("INVALID_CREDINENTIALS", "Invalid response received from server!", "invalid username and password");
 
             }
 
@@ -137,13 +131,13 @@ class DomainNameAPI_PHPLibrary {
     }
 
     public function GetCurrentBalance() {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"       => $this->_USERDATA_PASSWORD,
                 "UserName"       => $this->_USERDATA_USERNAME,
                 'CurrencyId'=>2
-            )
-        );
+            ]
+        ];
 
 
         //self::setRequestData($parameters);
@@ -167,16 +161,16 @@ class DomainNameAPI_PHPLibrary {
 
     // Check domain is avaliable? Ex: ('example1', 'example2'), ('com', 'net', 'org')
     public function CheckAvailability($Domains, $TLDs, $Period, $Command) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"       => $this->_USERDATA_PASSWORD,
                 "UserName"       => $this->_USERDATA_USERNAME,
                 "DomainNameList" => $Domains,
                 "TldList"        => $TLDs,
                 "Period"         => $Period,
                 "Commad"         => $Command
-            )
-        );
+            ]
+        ];
 
 
 
@@ -202,14 +196,14 @@ class DomainNameAPI_PHPLibrary {
 
             foreach ($data["DomainAvailabilityInfoList"]['DomainAvailabilityInfo'] as $name => $value) {
 
-                $available[] = array(
+                $available[] = [
                     "TLD"     => $value["Tld"],
                     "Status"  => $value["Status"],
                     "Command" => $value["Command"], // Komut create,renew,transfer,restore fiyatlarının çekilmesi
                     "Period"  => $value["Period"],
                     "IsFee"   => $value["IsFee"],
                     "Price"   => $value["Price"],
-                );
+                ];
 
             }
 
@@ -225,12 +219,12 @@ class DomainNameAPI_PHPLibrary {
 
     // Get domain details
     public function GetList() {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password" => $this->_USERDATA_PASSWORD,
                 "UserName" => $this->_USERDATA_USERNAME,
-            )
-        );
+            ]
+        ];
 
 
         //self::setRequestData($parameters);
@@ -244,7 +238,7 @@ class DomainNameAPI_PHPLibrary {
             $data = $response[key($response)];
 
             if (isset($data["TotalCount"]) && is_numeric($data["TotalCount"])) {
-                $result["data"]["Domains"] = array();
+                $result["data"]["Domains"] = [];
 
                 if (isset($data["DomainInfoList"]) && is_array($data["DomainInfoList"])) {
                     if (isset($data["DomainInfoList"]["DomainInfo"]["Id"])) {
@@ -263,7 +257,7 @@ class DomainNameAPI_PHPLibrary {
             } else {
                 // Set error
                 $result["result"] = "ERROR";
-                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!");;
+                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!");
             }
             return $result;
         });
@@ -279,14 +273,14 @@ class DomainNameAPI_PHPLibrary {
 
     // Get TLD details
     public function GetTldList($count=20) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password" => $this->_USERDATA_PASSWORD,
                 "UserName" => $this->_USERDATA_USERNAME,
                 'IncludePriceDefinitions'=>1,
                 'PageSize'=>$count
-            )
-        );
+            ]
+        ];
 
 
         //self::setRequestData($parameters);
@@ -351,13 +345,13 @@ class DomainNameAPI_PHPLibrary {
     public function GetDetails($DomainName) {
 
 
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"   => $this->_USERDATA_PASSWORD,
                 "UserName"   => $this->_USERDATA_USERNAME,
                 "DomainName" => $DomainName
-            )
-        );
+            ]
+        ];
 
 
         // Log last request and response
@@ -379,7 +373,7 @@ class DomainNameAPI_PHPLibrary {
             } else {
                 // Set error
                 $result["result"] = "ERROR";
-                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!");;
+                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!");
             }
             return $result;
         });
@@ -393,14 +387,14 @@ class DomainNameAPI_PHPLibrary {
 
     // Modify nameservers
     public function ModifyNameServer($DomainName, $NameServers) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"       => $this->_USERDATA_PASSWORD,
                 "UserName"       => $this->_USERDATA_USERNAME,
                 "DomainName"     => $DomainName,
                 "NameServerList" => $NameServers
-            )
-        );
+            ]
+        ];
 
 
         // Log last request and response
@@ -412,8 +406,7 @@ class DomainNameAPI_PHPLibrary {
 
             $data = $response[key($response)];
 
-            $result["data"]                = array();
-            $result["data"]["NameServers"] = array();
+            $result["data"]                = [];
             $result["data"]["NameServers"] = $parameters["request"]["NameServerList"];
             $result["result"]              = "OK";
 
@@ -427,13 +420,13 @@ class DomainNameAPI_PHPLibrary {
 
     // Enable Theft Protection Lock
     public function EnableTheftProtectionLock($DomainName) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"   => $this->_USERDATA_PASSWORD,
                 "UserName"   => $this->_USERDATA_USERNAME,
                 "DomainName" => $DomainName
-            )
-        );
+            ]
+        ];
 
 
         // Log last request and response
@@ -461,13 +454,13 @@ class DomainNameAPI_PHPLibrary {
 
     // Disable Theft Protection Lock
     public function DisableTheftProtectionLock($DomainName) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"   => $this->_USERDATA_PASSWORD,
                 "UserName"   => $this->_USERDATA_USERNAME,
                 "DomainName" => $DomainName
-            )
-        );
+            ]
+        ];
 
 
         // Log last request and response
@@ -492,15 +485,15 @@ class DomainNameAPI_PHPLibrary {
 
     // Add Child Nameserver
     public function AddChildNameServer($DomainName, $NameServer, $IPAdresses) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"        => $this->_USERDATA_PASSWORD,
                 "UserName"        => $this->_USERDATA_USERNAME,
                 "DomainName"      => $DomainName,
                 "ChildNameServer" => $NameServer,
                 "IpAddressList"   => [$IPAdresses]
-            )
-        );
+            ]
+        ];
 
 
         // Log last request and response
@@ -523,14 +516,14 @@ class DomainNameAPI_PHPLibrary {
 
     // Delete Child Nameserver
     public function DeleteChildNameServer($DomainName, $NameServer) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"        => $this->_USERDATA_PASSWORD,
                 "UserName"        => $this->_USERDATA_USERNAME,
                 "DomainName"      => $DomainName,
                 "ChildNameServer" => $NameServer
-            )
-        );
+            ]
+        ];
 
         // Log last request and response
         //self::setRequestData($parameters);
@@ -555,15 +548,15 @@ class DomainNameAPI_PHPLibrary {
 
     // Modify Child Nameserver
     public function ModifyChildNameServer($DomainName, $NameServer, $IPAdresses) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"        => $this->_USERDATA_PASSWORD,
                 "UserName"        => $this->_USERDATA_USERNAME,
                 "DomainName"      => $DomainName,
                 "ChildNameServer" => $NameServer,
                 "IpAddressList"   => $IPAdresses
-            )
-        );
+            ]
+        ];
 
         // Log last request and response
         //self::setRequestData($parameters);
@@ -587,15 +580,15 @@ class DomainNameAPI_PHPLibrary {
 
     // CONTACT MANAGEMENT
 
-    // Get Domain Contact informations
+    // Get Domain Contact information
     public function GetContacts($DomainName) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"   => $this->_USERDATA_PASSWORD,
                 "UserName"   => $this->_USERDATA_USERNAME,
                 "DomainName" => $DomainName
-            )
-        );
+            ]
+        ];
 
 
         // Log last request and response
@@ -641,8 +634,8 @@ class DomainNameAPI_PHPLibrary {
 
     // Set domain cantacts
     public function SaveContacts($DomainName, $Contacts) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"              => $this->_USERDATA_PASSWORD,
                 "UserName"              => $this->_USERDATA_USERNAME,
                 "DomainName"            => $DomainName,
@@ -650,8 +643,8 @@ class DomainNameAPI_PHPLibrary {
                 "BillingContact"        => $Contacts["Billing"],
                 "TechnicalContact"      => $Contacts["Technical"],
                 "RegistrantContact"     => $Contacts["Registrant"]
-            )
-        );
+            ]
+        ];
 
 
         // Log last request and response
@@ -687,8 +680,8 @@ class DomainNameAPI_PHPLibrary {
 
     // Start domain transfer (Incoming domain)
     public function Transfer($DomainName, $AuthCode,$Period) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"             => $this->_USERDATA_PASSWORD,
                 "UserName"             => $this->_USERDATA_USERNAME,
                 "DomainName"           => $DomainName,
@@ -701,8 +694,8 @@ class DomainNameAPI_PHPLibrary {
                         ]
                     ]
                 ]
-            )
-        );
+            ]
+        ];
 
         // Log last request and response
         //self::setRequestData($parameters);
@@ -739,13 +732,13 @@ class DomainNameAPI_PHPLibrary {
 
     // Cancel domain transfer (Incoming domain)
     public function CancelTransfer($DomainName) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"   => $this->_USERDATA_PASSWORD,
                 "UserName"   => $this->_USERDATA_USERNAME,
                 "DomainName" => $DomainName
-            )
-        );
+            ]
+        ];
 
         // Log last request and response
         //self::setRequestData($parameters);
@@ -772,14 +765,14 @@ class DomainNameAPI_PHPLibrary {
 
     // Renew domain
     public function Renew($DomainName, $Period) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"   => $this->_USERDATA_PASSWORD,
                 "UserName"   => $this->_USERDATA_USERNAME,
                 "DomainName" => $DomainName,
                 "Period"     => $Period
-            )
-        );
+            ]
+        ];
 
         // Log last request and response
         //self::setRequestData($parameters);
@@ -802,8 +795,8 @@ class DomainNameAPI_PHPLibrary {
     }
 
 
-    // Register domain with contact informations
-    public function RegisterWithContactInfo($DomainName, $Period, $Contacts, $NameServers = array("dns.domainnameapi.com", "web.domainnameapi.com"),  $TheftProtectionLock = true, $PrivacyProtection = false,$addionalAttributes=[]) {
+    // Register domain with contact information
+    public function RegisterWithContactInfo($DomainName, $Period, $Contacts, $NameServers = ["dns.domainnameapi.com", "web.domainnameapi.com"],  $TheftProtectionLock = true, $PrivacyProtection = false,$addionalAttributes=[]) {
         $parameters = [
             "request" => [
                 "Password"                => $this->_USERDATA_PASSWORD,
@@ -869,15 +862,15 @@ class DomainNameAPI_PHPLibrary {
             $Reason = "Owner request";
         }
 
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"       => $this->_USERDATA_PASSWORD,
                 "UserName"       => $this->_USERDATA_USERNAME,
                 "DomainName"     => $DomainName,
                 "ProtectPrivacy" => $Status,
                 "Reason"         => $Reason
-            )
-        );
+            ]
+        ];
 
         // Log last request and response
         //self::setRequestData($parameters);
@@ -899,13 +892,13 @@ class DomainNameAPI_PHPLibrary {
 
     // Sync domain
     public function SyncFromRegistry($DomainName) {
-        $parameters = array(
-            "request" => array(
+        $parameters = [
+            "request" => [
                 "Password"   => $this->_USERDATA_PASSWORD,
                 "UserName"   => $this->_USERDATA_USERNAME,
                 "DomainName" => $DomainName
-            )
-        );
+            ]
+        ];
 
         // Log last request and response
         //self::setRequestData($parameters);
@@ -941,12 +934,12 @@ class DomainNameAPI_PHPLibrary {
 
 
      // Convert object to array
-    private function objectToArray($o) {
+    private function objectToArray($_obj) {
         try {
-            $o = json_decode(json_encode($o), true);
+            $_obj = json_decode(json_encode($_obj), true);
         } catch (Exception $ex) {
         }
-        return $o;
+        return $_obj;
     }
 
     // Get error if exists
@@ -955,20 +948,20 @@ class DomainNameAPI_PHPLibrary {
 
         if (is_null($response)) {
             // Set error data
-            $result            = array();
+            $result            = [];
             $result["Code"]    = "INVALID_RESPONSE";
             $result["Message"] = "Invalid response or no response received from server!";
             $result["Details"] = "SOAP Connection returned null value!";
         } elseif (!is_array($response)) {
             // Set error data
-            $result            = array();
+            $result            = [];
             $result["Code"]    = "INVALID_RESPONSE";
             $result["Message"] = "Invalid response or no response received from server!";
             $result["Details"] = "SOAP Connection returned non-array value!";
         } elseif (strtolower(key($response)) == "faultstring") {
             // Handle soap fault
 
-            $result            = array();
+            $result            = [];
             $result["Code"]    = "";
             $result["Message"] = "";
             $result["Details"] = "";
@@ -995,24 +988,23 @@ class DomainNameAPI_PHPLibrary {
 
         } elseif (count($response) != 1) {
             // Set error data
-            $result            = array();
+            $result            = [];
             $result["Code"]    = "INVALID_RESPONSE";
             $result["Message"] = "Invalid response or no response received from server!";
             $result["Details"] = "Response data contains more than one result! Only one result accepted!";
         } elseif (!isset($response[key($response)]["OperationResult"]) || !isset($response[key($response)]["ErrorCode"])) {
             // Set error data
-            $result            = array();
+            $result            = [];
             $result["Code"]    = "INVALID_RESPONSE";
             $result["Message"] = "Invalid response or no response received from server!";
             $result["Details"] = "Operation result or Error code not received from server!";
         } elseif (strtoupper($response[key($response)]["OperationResult"]) != "SUCCESS") {
             // Set error data
-            $result            = array();
-            $result["Code"]    = "";
-            $result["Message"] = "";
-            $result["Details"] = "";
-
-            $result["Message"] = "Failed";
+            $result            = [
+                "Code"    => '',
+                "Message" => 'Failed',
+                "Details" => '',
+            ];
 
             if (isset($response[key($response)]["OperationMessage"])) {
                 $result["Code"] = "API_" . $response[key($response)]["ErrorCode"];
@@ -1026,8 +1018,6 @@ class DomainNameAPI_PHPLibrary {
                 $result["Details"] = $response[key($response)]["OperationMessage"];
             }
 
-        } else {
-
         }
 
         return $result;
@@ -1040,7 +1030,7 @@ class DomainNameAPI_PHPLibrary {
 
     // Set error message
     private function setError($Code, $Message, $Details) {
-        $result            = array();
+        $result            = [];
         $result["Code"]    = $Code;
         $result["Message"] = $Message;
         $result["Details"] = $Details;
@@ -1049,7 +1039,7 @@ class DomainNameAPI_PHPLibrary {
 
     // Parse domain info
     private function parseDomainInfo($data) {
-        $result                                     = array();
+        $result                                     = [];
         $result["ID"]                               = "";
         $result["Status"]                           = "";
         $result["DomainName"]                       = "";
@@ -1057,22 +1047,22 @@ class DomainNameAPI_PHPLibrary {
         $result["LockStatus"]                       = "";
         $result["PrivacyProtectionStatus"]          = "";
         $result["IsChildNameServer"]                = "";
-        $result["Contacts"]                         = array();
-        $result["Contacts"]["Billing"]              = array();
-        $result["Contacts"]["Technical"]            = array();
-        $result["Contacts"]["Administrative"]       = array();
-        $result["Contacts"]["Registrant"]           = array();
+        $result["Contacts"]                         = [];
+        $result["Contacts"]["Billing"]              = [];
+        $result["Contacts"]["Technical"]            = [];
+        $result["Contacts"]["Administrative"]       = [];
+        $result["Contacts"]["Registrant"]           = [];
         $result["Contacts"]["Billing"]["ID"]        = "";
         $result["Contacts"]["Technical"]["ID"]      = "";
         $result["Contacts"]["Administrative"]["ID"] = "";
         $result["Contacts"]["Registrant"]["ID"]     = "";
-        $result["Dates"]                            = array();
+        $result["Dates"]                            = [];
         $result["Dates"]["Start"]                   = "";
         $result["Dates"]["Expiration"]              = "";
         $result["Dates"]["RemainingDays"]           = "";
-        $result["NameServers"]                      = array();
-        $result["Additional"]                       = array();
-        $result["ChildNameServers"]                 = array();
+        $result["NameServers"]                      = [];
+        $result["Additional"]                       = [];
+        $result["ChildNameServers"]                 = [];
 
         foreach ($data as $attrName => $attrValue) {
             switch ($attrName) {
@@ -1213,7 +1203,7 @@ class DomainNameAPI_PHPLibrary {
 
                                     if (isset($attribute["ChildNameServer"]) && isset($attribute["IpAddress"])) {
                                         $ns          = "";
-                                        $IpAddresses = array();
+                                        $IpAddresses = [];
 
                                         // Name of NameServer
                                         if (is_string($attribute["ChildNameServer"])) {
@@ -1237,10 +1227,10 @@ class DomainNameAPI_PHPLibrary {
 
                                         }
 
-                                        $result["ChildNameServers"][] = array(
+                                        $result["ChildNameServers"][] = [
                                             "ns"  => $ns,
                                             "ip" => $IpAddresses
-                                        );
+                                        ];
 
 
                                     }
@@ -1263,11 +1253,11 @@ class DomainNameAPI_PHPLibrary {
 
     // Parse Contact info
     private function parseContactInfo($data) {
-        $result                                  = array();
+        $result                                  = [];
         $result["ID"]                            = "";
         $result["Status"]                        = "";
-        $result["Additional"]                    = array();
-        $result["Address"]                       = array();
+        $result["Additional"]                    = [];
+        $result["Address"]                       = [];
         $result["Address"]["Line1"]              = "";
         $result["Address"]["Line2"]              = "";
         $result["Address"]["Line3"]              = "";
@@ -1275,8 +1265,8 @@ class DomainNameAPI_PHPLibrary {
         $result["Address"]["City"]               = "";
         $result["Address"]["Country"]            = "";
         $result["Address"]["ZipCode"]            = "";
-        $result["Phone"]                         = array();
-        $result["Phone"]["Phone"]                = array();
+        $result["Phone"]                         = [];
+        $result["Phone"]["Phone"]                = [];
         $result["Phone"]["Phone"]["Number"]      = "";
         $result["Phone"]["Phone"]["CountryCode"] = "";
         $result["Phone"]["Fax"]["Number"]        = "";
@@ -1472,7 +1462,7 @@ class DomainNameAPI_PHPLibrary {
         try {
 
             // SOAP method which is same as current function name called
-            $_response = $this->service->__soapCall($fn, array($parameters));
+            $_response = $this->service->__soapCall($fn, [$parameters]);
 
             //die(jsson_encode($_response));
 
@@ -1511,6 +1501,12 @@ class DomainNameAPI_PHPLibrary {
 
     }
 
+
+    /**
+     * Domain is TR type
+     * @param $domain
+     * @return bool
+     */
     public function isTrTLD($domain){
         preg_match('/\.com\.tr|\.net\.tr|\.org\.tr|\.biz\.tr|\.info\.tr|\.tv\.tr|\.gen\.tr|\.web\.tr|\.tel\.tr|\.name\.tr|\.bbs\.tr|\.gov\.tr|\.bel\.tr|\.pol\.tr|\.edu\.tr|\.k12\.tr|\.av\.tr|\.dr\.tr$/', $domain, $result);
 
