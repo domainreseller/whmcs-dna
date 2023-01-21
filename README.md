@@ -116,3 +116,25 @@ Daha fazla bilgi için : <a href="https://docs.whmcs.com/Registrar_TLD_Sync">Whm
 
 
 
+## Testler
+
+
+
+| Test Adı       | GTLD | TRTLD |
+|----------------|------|-------|
+| Register       | ✓    | ✓     |
+| Transfer       | ✓    | ✓     | 
+| Renew          | ✓    | ✓     | 
+| Nameserver     | ✓    | ✓     | 
+| RegistrarLock  | ✓    | ✓     | 
+| Contact        | ✓    | ✓     | 
+| EPP            | ✓    | ✓     | 
+| Delete         | ✓    | ✓     | 
+| SubNameserver  | ✓    | ✓     | 
+| Availability   | ✓    | ✓     | 
+| PricingSnyc    | ✓    | ✓     | 
+| CancelTransfer | ✓    | ✓     | 
+| Sync           | ✓    | ✓     | 
+| TransferSync   | ✓    | ✓     | 
+
+

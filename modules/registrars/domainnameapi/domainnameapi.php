@@ -38,7 +38,7 @@ function domainnameapi_getConfigArray($params) {
             $password = $params["API_Password"];
             $testmode = $params["API_TestMode"];
 
-            $sysMsg = domainnameapi_parse_cache('user_'.$username.$password.$testmode, 512, function () use ($username, $password, $testmode) {
+            $sysMsg = domainnameapi_parse_cache('user_'.$username.$password.$testmode, 100, function () use ($username, $password, $testmode) {
                 $dna     = new \DomainNameApi\DomainNameAPI_PHPLibrary($username, $password, $testmode);
                 $details = $dna->GetResellerDetails();
 
@@ -47,9 +47,8 @@ function domainnameapi_getConfigArray($params) {
                 } else {
                     return "User: <b>{$details['name']}({$details['id']})</b> , Balance: <b>{$details['balance']}{$details['symbol']}</b>";
                 }
+
             });
-
-
 
         }
 
@@ -1296,7 +1295,7 @@ function domainnameapi_parse_clientinfo($params) {
     $city        = $params["City"] ?? $params["city"];
     $country     = $params["Country"] ?? $params["countrycode"];
     $fax         = $params["Fax"] ?? $params["phonenumber"];
-    $faxcc       = $params["Fax Country Code"] ?? $params["phonenumber"];
+    $faxcc       = $params["Fax Country Code"] ?? $params["phonecc"];
     $phonecc     = $params["Phone Country Code"] ?? $params["phonecc"];
     $phone       = $params["Phone"] ?? $params["phonenumber"];
     $postcode    = $params["ZIP Code"] ?? $params["postcode"];
@@ -1337,15 +1336,17 @@ function domainnameapi_parse_trcontact($contactDetails) {
     }
 
     $tr_domain_fields = [
-        'TRABISDOMAINCATEGORY'          => strlen($contactDetails['companyname']) > 0 ? '0' : '1',
-        'TRABISNAMESURNAME'          => $contactDetails['firstname'] . ' ' . $contactDetails['lastname'],
-        'TRABISCOUNTRYID'       => 215,
-        'TRABISCITIYID'          => 34,
+        'TRABISDOMAINCATEGORY' => strlen($contactDetails['companyname']) > 0 ? '0' : '1',
+        'TRABISNAMESURNAME'    => $contactDetails['firstname'] . ' ' . $contactDetails['lastname'],
+        'TRABISCOUNTRYID'      => 215,
+        'TRABISCITIYID'        => 34,
+        'TRABISCOUNTRYNAME'    => $contactDetails['countrycode'],
+        'TRABISCITYNAME'       => $contactDetails['city'],
     ];
 
     $tr_domain_fields['TRABISORGANIZATION'] = $contactDetails['companyname'];
-    $tr_domain_fields['TRABISTAXOFFICE']   = is_numeric($contactDetails['TrTaxOffice']) ? $cf[$contactDetails['TrTaxOffice']] : 'Kadikoy V.D.';
-    $tr_domain_fields['TRABISTAXNUMBER']   = is_numeric($contactDetails['TrTaxNumber']) ? $cf[$contactDetails['TrTaxNumber']] : '1111111111';
+    $tr_domain_fields['TRABISTAXOFFICE']    = is_numeric($contactDetails['TrTaxOffice']) ? $cf[$contactDetails['TrTaxOffice']] : 'Kadikoy V.D.';
+    $tr_domain_fields['TRABISTAXNUMBER']    = is_numeric($contactDetails['TrTaxNumber']) ? $cf[$contactDetails['TrTaxNumber']] : '1111111111';
     $tr_domain_fields['TRABISCITIZIENID']   = is_numeric($contactDetails['TrIdendity']) ? $cf[$contactDetails['TrIdendity']] : '11111111111';
 
     if (strlen($contactDetails['companyname'])>0 ) {

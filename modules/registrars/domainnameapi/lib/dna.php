@@ -43,12 +43,10 @@ class DomainNameAPI_PHPLibrary {
     // USE TEST PLATFORM OR REAL PLATFORM
     // if value equals false, use real platform, otherwise use test platform
     private function useTestMode($value = true) {
-        if ($value === true) {
+        if ($value === true || $value=='on') {
             $this->_USERDATA_USERNAME = 'test1.dna@apiname.com';
             $this->_USERDATA_PASSWORD = 'FsUvpJMzQ69scpqE';
         }
-
-        //$this->con = new APIConnection_SOAP($this->_URL_SERVICE);
     }
 
     // SET Username and Password
@@ -540,23 +538,24 @@ class DomainNameAPI_PHPLibrary {
             ];
         });
 
-
-
         return $response;
+
     }
 
 
     // Modify Child Nameserver
     public function ModifyChildNameServer($DomainName, $NameServer, $IPAdresses) {
+
         $parameters = [
             "request" => [
                 "Password"        => $this->_USERDATA_PASSWORD,
                 "UserName"        => $this->_USERDATA_USERNAME,
                 "DomainName"      => $DomainName,
                 "ChildNameServer" => $NameServer,
-                "IpAddressList"   => $IPAdresses
+                "IpAddressList"   => [$IPAdresses]
             ]
         ];
+
 
         // Log last request and response
         //self::setRequestData($parameters);
