@@ -673,6 +673,7 @@ function domainnameapi_DeleteNameserver($params) {
     return $values;
 }
 
+/*
 function domainnameapi_RequestDelete($params) {
     require_once __DIR__.'/lib/dna.php';
 
@@ -703,6 +704,7 @@ function domainnameapi_RequestDelete($params) {
     );
     return $values;
 }
+*/
 
 function domainnameapi_IDProtectToggle($params) {
     require_once __DIR__.'/lib/dna.php';
@@ -1349,7 +1351,7 @@ function domainnameapi_parse_trcontact($contactDetails) {
     $tr_domain_fields['TRABISTAXNUMBER']    = is_numeric($contactDetails['TrTaxNumber']) ? $cf[$contactDetails['TrTaxNumber']] : '1111111111';
     $tr_domain_fields['TRABISCITIZIENID']   = is_numeric($contactDetails['TrIdendity']) ? $cf[$contactDetails['TrIdendity']] : '11111111111';
 
-    if (strlen($contactDetails['companyname'])>0 ) {
+    if (strlen($contactDetails['companyname'])<1 ) {
         unset($tr_domain_fields['TRABISORGANIZATION']);
         unset($tr_domain_fields['TRABISTAXOFFICE']);
         unset($tr_domain_fields['TRABISTAXNUMBER']);
