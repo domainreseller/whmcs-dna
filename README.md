@@ -31,6 +31,9 @@
 - Kaydettikten sonra Kullanıcı adınız ve mevcut bakiyeniz görünüyor olacaktır.
 - Kullanıcılarınıza ait .tr alan adını almak için kullanılacak TC Kimlik numarası ve Vergi Numarası Bilgilerini varsa görmüş olduğunuz ayarlardan eşleştiriniz.
 
+<a href="https://youtu.be/LEw_iMnquSo">+ Youtube link </a>
+
+
 <hr>
 
 ## Fiyatlandırma , TLD İlişkilendirme ve Lookup Ayarları
