@@ -4,7 +4,7 @@
 
 - WHMCS 7.8 veya üstü
 - PHP7.4 veya daha üstü (Önerilen 8.1) 
-- PHP SOAPClient eklentisi 
+- PHP SOAPClient eklentisi aktif olmalıdır.
 - Müşteri T.C. kimlik bilgisi / Vergi Numarası/ Vergi Dairesi bilgilerini içeren customfield lar. (Opsiyonal)
 
 ## Kurulum
