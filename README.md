@@ -9,6 +9,10 @@
 
 ## Kurulum
 
+!!!! Dikkat !!!!
+
+_**Eğer sürüm yükseltiyorsanız Kurulumdan önce eski dosyalarınızı yedekleyiniz.**_
+
 İndirdiğiniz klasör içindeki "modules" klasörünün Whmcs kurulu olduğu klasörün içine atın. (Örnek: /home/whmcs/public_html)
 .gitinore, README.md, LICENSE dosyalarını atmayın.
 
