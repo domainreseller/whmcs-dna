@@ -95,18 +95,25 @@ class DomainNameAPI_PHPLibrary {
                 $resp['name']     = $data['ResellerInfo']['Name'];
 
                 $active_currency = $data['ResellerInfo']['BalanceInfoList']['BalanceInfo'][0];
-
-
+                $balances = [];
                 foreach ($data['ResellerInfo']['BalanceInfoList']['BalanceInfo'] as $k => $v) {
 
                     if ($v['CurrencyName'] == $data['ResellerInfo']['CurrencyInfo']['Code']) {
                         $active_currency = $v;
                     }
+
+                    $balances[]= [
+                        'balance'  => $v['Balance'],
+                        'currency' => $v['CurrencyName'],
+                        'symbol'   => $v['CurrencySymbol'],
+                    ];
                 }
 
                 $resp['balance']  = $active_currency['Balance'];
                 $resp['currency'] = $active_currency['CurrencyName'];
                 $resp['symbol']   = $active_currency['CurrencySymbol'];
+                $resp['balances'] = $balances;
+
             } else {
                 $resp['result'] = 'ERROR';
                 $resp['error'] = $this->setError("INVALID_CREDINENTIALS", "Invalid response received from server!", "invalid username and password");

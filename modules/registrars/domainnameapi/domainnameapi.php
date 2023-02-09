@@ -35,20 +35,28 @@ function domainnameapi_getConfigArray($params) {
             require_once __DIR__ . '/lib/dna.php';
 
             $username = $params["API_UserName"];
+
             $password = $params["API_Password"];
             $testmode = $params["API_TestMode"];
 
-            $sysMsg = domainnameapi_parse_cache('user_'.$username.$password.$testmode, 100, function () use ($username, $password, $testmode) {
+
+           // $sysMsg = domainnameapi_parse_cache('user_'.$username.$password.$testmode, 100, function () use ($username, $password, $testmode) {
                 $dna     = new \DomainNameApi\DomainNameAPI_PHPLibrary($username, $password, $testmode);
                 $details = $dna->GetResellerDetails();
 
                 if ($details['result'] != 'OK') {
-                    return "Username and password combination not correct";
+                     $sysMsg = "Username and password combination not correct";
                 } else {
-                    return "User: <b>{$details['name']}({$details['id']})</b> , Balance: <b>{$details['balance']}{$details['symbol']}</b>";
+                    $balances = [];
+                     $sysMsg = "User: <b>{$details['name']}({$details['id']})</b> , Balance: ";
+                    foreach ($details['balances'] as $k => $v) {
+                        $balances[]= "<b>{$v['balance']}{$v['symbol']}</b>";
+                     }
+                    $sysMsg .= implode(' | ', $balances);
+
                 }
 
-            });
+           // });
 
         }
 
