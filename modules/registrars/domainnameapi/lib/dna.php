@@ -308,9 +308,10 @@ class DomainNameAPI_PHPLibrary {
 
                 foreach ($data["TldInfoList"]['TldInfo'] as $k => $v) {
 
-                    $pricing = [];
+                    $pricing = $currencies =[];
                     foreach ($v['PriceInfoList']['TldPriceInfo'] as $kp => $vp) {
                         $pricing[strtolower($vp['TradeType'])][$vp['Period']]=$vp['Price'];
+                        $currencies[strtolower($vp['TradeType'])]=$vp['CurrencyName'];
                     }
 
                     $tlds[] = [
@@ -321,7 +322,8 @@ class DomainNameAPI_PHPLibrary {
                         'minchar'   => $v['MinCharacterCount'],
                         'minperiod' => $v['MinRegistrationPeriod'],
                         'tld'       => $v['Name'],
-                        'pricing'=>$pricing
+                        'pricing'=>$pricing,
+                        'currencies'=>$currencies,
                     ];
 
                 }

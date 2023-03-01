@@ -105,6 +105,17 @@ function domainnameapi_getConfigArray($params) {
                 'Options'      => $customfields,
                 'Description'  => 'Turkish TaxNumber Custom Field , required only .tr tld',
             ],
+            'basecurrency' => [
+                'FriendlyName' => 'Exchange Convertion For TLD Sync',
+                'Type'         => 'dropdown',
+                'Options'      => [
+                    'no'  => 'Do Not Convert',
+                    'TRY' => 'to TRY',
+                    //'IRR' => 'to IRR',
+                    //'PKR' => 'to PKR',
+                ],
+                'Description'  => 'Base Currency Convertion. <br>If your base currency is not USD, please select your base currency. <br>Exchange rates  based on <a href="https://www.tcmb.gov.tr/kurlar/today.xml">TCMB</a> Due to currency fluctuations; the exchange rate may be different from the actual exchange rate , prices may vary over time.',
+            ],
         ];
     } else {
         return [
@@ -282,7 +293,7 @@ function domainnameapi_SaveRegistrarLock($params) {
             }
 
             if($result["result"] == "OK") {
-                $values = array("success" => true);
+                $values = ["success" => true];
             } else {
                 $values["error"] = $result["error"]["Message"] . " - " . $result["error"]["Details"];
             }
@@ -320,7 +331,7 @@ function domainnameapi_RegisterDomain($params) {
     $dna = new \DomainNameApi\DomainNameAPI_PHPLibrary($username,$password,$testmode);
 
 
-    $nameServers = array();
+    $nameServers = [];
     $period = 1;
     $privacyProtection = false;
 
@@ -352,7 +363,7 @@ function domainnameapi_RegisterDomain($params) {
         // Years
         $period,
         // Contact informations
-        array(
+        [
             // Administrative contact
             "Administrative" => domainnameapi_parse_clientinfo($params),
             // Billing contact
@@ -361,7 +372,7 @@ function domainnameapi_RegisterDomain($params) {
             "Technical" => domainnameapi_parse_clientinfo($params),
             // Registrant contact
             "Registrant" => domainnameapi_parse_clientinfo($params),
-        ),
+        ],
         // Nameservers
         $nameServers,
         // Theft protection lock enabled
@@ -734,7 +745,7 @@ function domainnameapi_IDProtectToggle($params) {
     }
 
     if ($result["result"] == "OK") {
-        $values = array("success" => true);
+        $values = ["success" => true];
     } else {
         $values["error"] = $result["error"]["Message"] . " - " . $result["error"]["Details"];
     }
@@ -754,8 +765,6 @@ function domainnameapi_GetDNS($params)
 {
     $values["error"] = "DNS Management does not supported by Domain Name API.";
 
-    // Log request
-    //logModuleCall("domainnameapi", substr(__FUNCTION__, 14), array("parameters" => $params, "request" => api($params["API_UserName"], $params["API_Password"], $params["API_TestMode"])->__REQUEST), array("response" => api($params["API_UserName"], $params["API_Password"], $params["API_TestMode"])->__RESPONSE), $values, [$username,$password]);
 
     return $values;
 }
@@ -764,8 +773,6 @@ function domainnameapi_SaveDNS($params)
 {
     $values["error"] = "DNS Management does not supported by Domain Name API!!!";
 
-    // Log request
-    //logModuleCall("domainnameapi", substr(__FUNCTION__, 14), array("parameters" => $params, "request" => api($params["API_UserName"], $params["API_Password"], $params["API_TestMode"])->__REQUEST), array("response" => api($params["API_UserName"], $params["API_Password"], $params["API_TestMode"])->__RESPONSE), $values, [$username,$password]);
 
     return $values;
 }
@@ -790,23 +797,9 @@ function domainnameapi_CheckAvailability($params) {
 
     $tldslist = $params['tldsToInclude'];
     $premiumEnabled = (bool) $params['premiumEnabled'];
-    $domainslist = array();
+    $domainslist = [];
     $results = new ResultsList();
 
-    /*
-    foreach($tldslist as $tld){
-        if(!empty($tld[0])){
-            if($tld[0] != '.'){
-                $tld = ".".$tld;
-            }
-            $domain = $label.$tld;
-            if(!in_array($domain, $domainslist["all"])){
-                $domainslist["all"][] = $domain;
-                $domainslist["list"][] = array("sld" => $label, "tld" => $tld);
-            }
-        }
-    }
-    */
 
     $result=null;
 
@@ -821,23 +814,34 @@ function domainnameapi_CheckAvailability($params) {
     //$tld=str_replace(".","",$domain['tld']);
     $result = $dna->CheckAvailability([$label],$all_tlds,"1","create");
 
+    $exchange_rates = domainnameapi_exchangerates();
+
+
     foreach ($result as $k => $v) {
         $searchResult = new SearchResult($label, '.'.$v['TLD']);
+
+        $register_price = $v['Price'];
+        $renew_price = $v['Price'];
+
+        if(strpos($v['TLD'],'.tr' ) !== false){
+            $register_price = $register_price / $exchange_rates['TRY'];
+            $renew_price = $renew_price / $exchange_rates['TRY'];
+        }
+
+
 
         if ($v['Status'] == 'available') {
 
             $status = SearchResult::STATUS_NOT_REGISTERED;
             $searchResult->setStatus($status);
 
-            if ($v['IsFee']=='1') {
+            if ($v['IsFee'] == '1') {
                 $searchResult->setPremiumDomain(true);
-                $searchResult->setPremiumCostPricing(
-                    array(
-                        'register' => $v['Price'],
-                        'renew' => $v['Price'],
+                $searchResult->setPremiumCostPricing([
+                        'register'     => $register_price,
+                        'renew'        => $renew_price,
                         'CurrencyCode' => 'USD',
-                    )
-                );
+                    ]);
             }
 
         }else{
@@ -865,92 +869,7 @@ function domainnameapi_CheckAvailability($params) {
 
 
 }
-/*
-function domainnameapi_GetDomainSuggestions($params){
 
-
-
-    require_once __DIR__.'/lib/dna.php';
-
-    $username = $params["API_UserName"];
-    $password = $params["API_Password"];
-    $testmode = $params["API_TestMode"];
-
-    $values=[];
-
-    $dna = new \DomainNameApi\DomainNameAPI_PHPLibrary($username,$password,$testmode);
-
-
-    // user defined configuration values
-    $userIdentifier = $params['API Username'];
-    $apiKey = $params['API Key'];
-    $testMode = $params['Test Mode'];
-    $accountMode = $params['Account Mode'];
-    $emailPreference = $params['Email Preference'];
-    $additionalInfo = $params['Additional Information'];
-
-    // availability check parameters
-    $searchTerm = $params['searchTerm'];
-    $punyCodeSearchTerm = $params['punyCodeSearchTerm'];
-
-    $isIdnDomain = (bool) $params['isIdnDomain'];
-    $premiumEnabled = (bool) $params['premiumEnabled'];
-    $suggestionSettings = $params['suggestionSettings'];
-
-
-
-
-    foreach (Capsule::table('tbldomainpricing')->get() as $client) {
-        $tldsToInclude[]=str_replace(".","",$client->extension);
-    }
-
-
-    $results = new ResultsList();
-    foreach ($tldsToInclude  as $tdl) {
-        $result = $dna->CheckAvailability(array($searchTerm),array($tdl),"1","create");
-        $searchResult = new SearchResult($searchTerm,$tdl);
-            foreach($result as $domain){
-                if ($domain['Status'] == 'available') {
-                    $status = SearchResult::STATUS_NOT_REGISTERED;
-                    $searchResult->setStatus($status);
-                        if ($domain['IsFee']=='1') {
-                            $searchResult->setPremiumDomain(true);
-                            $searchResult->setPremiumCostPricing(
-                                array(
-                                    'register' => $domain['Price'],
-                                    'renew' => $domain['Price'],
-                                    'CurrencyCode' => 'USD',
-                                )
-                            );
-                        }
-                    $results->append($searchResult);
-
-                }
-
-
-
-
-            }
-
-        }
-
-    return $results;
-
-
-
-
-}
-
-function domainnameapi_DomainSuggestionOptions() {
-    return array(
-        'includeCCTlds' => array(
-            'FriendlyName' => 'Include Country Level TLDs',
-            'Type' => 'yesno',
-            'Description' => 'Tick to enable',
-        ),
-    );
-}
-*/
 function domainnameapi_GetTldPricing($params) {
     // Perform API call to retrieve extension information
     // A connection error should return a simple array with error key and message
@@ -968,23 +887,54 @@ function domainnameapi_GetTldPricing($params) {
 
     $tldlist = $dna->GetTldList(800);
 
+    $convertable_currencies = domainnameapi_exchangerates();
+
     $results = new ResultsList;
 
     if ($tldlist['result'] == 'OK') {
         foreach ($tldlist['data'] as $extension) {
-            $item = (new ImportItem)->setExtension($extension['tld'])
-                                    ->setMinYears($extension['minperiod'])
-                                    ->setMaxYears($extension['maxperiod'])
-                                    ->setRegisterPrice($extension['pricing']['registration'][1])
-                                    ->setRenewPrice($extension['pricing']['renew'][1])
-                                    ->setTransferPrice($extension['pricing']['transfer'][1])
-                                    ->setCurrency('USD');
-                                    //->setRedemptionFeeDays($extension['redemptionDays'])
-                                    //->setRedemptionFeePrice($extension['redemptionFee'])
-                                    //->setEppRequired($extension['transferSecretRequired'])
+
+            $price_registration = $extension['pricing']['registration'][1];
+            $price_renew        = $extension['pricing']['renew'][1];
+            $price_transfer     = $extension['pricing']['transfer'][1];
+            $current_currency   = $extension['currencies']['registration'];
+
+            if($current_currency=='TL'){
+                $current_currency='TRY';
+            }elseif(strlen($current_currency)<>3){
+                $current_currency='USD';
+            }
 
 
+
+            if (in_array($params["basecurrency"], array_keys($convertable_currencies))) {
+
+                $exchange_rate = $convertable_currencies[$params["basecurrency"]];
+
+                if ($current_currency == 'USD') {
+                    $price_registration = $price_registration * $exchange_rate;
+                    $price_renew        = $price_renew * $exchange_rate;
+                    $price_transfer     = $price_transfer * $exchange_rate;
+                }
+
+                if($current_currency=='TRY'){
+                    $price_registration = $price_registration * $exchange_rate/$convertable_currencies['TRY'];
+                    $price_renew        = $price_renew * $exchange_rate/$convertable_currencies['TRY'];
+                    $price_transfer     = $price_transfer * $exchange_rate/$convertable_currencies['TRY'];
+                }
+
+                $current_currency   = $params["basecurrency"];
+            }
+
+            $item      = (new ImportItem)->setExtension($extension['tld'])
+                                         ->setMinYears($extension['minperiod'])
+                                         ->setMaxYears($extension['maxperiod'])
+                                         ->setRegisterPrice($price_registration)
+                                         ->setRenewPrice($price_renew)
+                                         ->setTransferPrice($price_transfer)
+                                         ->setCurrency($current_currency);
             $results[] = $item;
+
         }
     }
 
@@ -1178,15 +1128,14 @@ function domainnameapi_TransferSync($params) {
 }
 
 function domainnameapi_AdminCustomButtonArray() {
-    $buttonarray = array(
+    return [
         "Cancel Transfer" => "canceltransfer",
-    );
-    return $buttonarray;
+    ];
 }
 
 function domainnameapi_canceltransfer($params) {
 
-     require_once __DIR__.'/lib/dna.php';
+    require_once __DIR__.'/lib/dna.php';
 
     $username = $params["API_UserName"];
     $password = $params["API_Password"];
@@ -1382,5 +1331,35 @@ function domainnameapi_parse_cache($key,$ttl,$callback){
         file_put_contents($file_name,serialize($data));
         return $data;
     }
+}
+
+function domainnameapi_exchangerates() {
+    $url   = 'https://www.tcmb.gov.tr/kurlar/today.xml';
+    $xml   = simplexml_load_file($url);
+    $rates = [];
+    foreach ($xml->Currency as $k => $v) {
+
+        $name = (string)$v->attributes()->Isim;
+        $code = (string)$v->attributes()->CurrencyCode;
+
+
+        $CrossRateUSD   = (string)$v->CrossRateUSD;
+        $CrossRateOther = (string)$v->CrossRateOther;
+        $forex_selling  = (string)$v->ForexSelling;
+
+        if (!isset($rates[$code])) {
+            if (strlen($CrossRateOther) > 0) {
+                $rates[$code] = $CrossRateOther;
+            } elseif (strlen($CrossRateUSD) > 0) {
+                $rates[$code] = $CrossRateUSD;
+            } else {
+                $rates[$code] = $forex_selling;
+            }
+        }
+    }
+    $rates['TRY'] = $rates['USD'];
+    unset($rates['USD']);
+    unset($rates['XDR']);
+    return $rates;
 }
 

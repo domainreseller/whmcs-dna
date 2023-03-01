@@ -37,6 +37,8 @@ Do not discard .gitinore, README.md, LICENSE files. - (İndirdiğiniz klasör i�
 - After activating, enter the username and password obtained by us. - (Aktive ettikten sonra tarafımızdan edindiğiniz kullanıcı adı şifreyi girin.)
 - After saving, your username and current balance will be visible. - (Kaydettikten sonra Kullanıcı adınız ve mevcut bakiyeniz görünüyor olacaktır.)
 - Match the TR Identity Number and Tax Number Information to be used to obtain the .tr domain name of your users, if any, from the settings you have seen. - (Kullanıcılarınıza ait .tr alan adını almak için kullanılacak TC Kimlik numarası ve Vergi Numarası Bilgilerini varsa görmüş olduğunuz ayarlardan eşleştiriniz.)
+- If you are using single-primary currency except USD You may set "Exchange Convertion For TLD Sync" setting. (This setting is using for only pricing sync for regional TLD imports. Otherwise you do not need to change) - (USD dışında bir tek ana para birimi kullanıyorsanız "Exchange Convertion For TLD Sync" ayarını yapabilirsiniz.)	( Bu ayar sadece bölgesel TLD importlarında fiyatlandırma senkronizasyonu için kullanılıyor. Aksi takdirde değiştirmenize gerek yoktur.)
+
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Youtube link </a>
 
@@ -167,3 +169,14 @@ Daha fazla bilgi için : <a href="https://docs.whmcs.com/Registrar_TLD_Sync">Whm
 | CancelTransfer | ✓    | ✓     | 
 | Sync           | ✓    | ✓     | 
 | TransferSync   | ✓    | ✓     | 
+
+
+## Troubleshooting - (Sorun Giderme)
+- I alredy added new customfields but in settings i cannot see them. - (Yeni customfield ekledim fakat ayarlarda göremiyorum.)
+
+- The cache may have expired. Delete all files in cache folder. - (Önbellek süresi dolmamış olabilir. Cache klasöründeki tüm dosyaları silin.)
+<hr>
+
+- I got error "Parsing WSDL: Couldn't load from..." - (Hata "Parsing WSDL: Couldn't load from..." )
+
+- Looks like network problem. Your Server's Ip address might be blocked by registry. Reach us for solving.  - (Muhtemelen ağ ve IP problemleri. Sunucunuzun IP adresi kayıt kuruluşu tarafından engellenmiş olabilir. Çözüm için bizimle iletişime geçin.)
