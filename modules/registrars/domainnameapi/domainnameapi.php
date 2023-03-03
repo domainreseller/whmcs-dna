@@ -893,51 +893,55 @@ function domainnameapi_GetTldPricing($params) {
 
     if ($tldlist['result'] == 'OK') {
         foreach ($tldlist['data'] as $extension) {
+            if(strlen($extension['tld'])>1){
 
-            $price_registration = $extension['pricing']['registration'][1];
-            $price_renew        = $extension['pricing']['renew'][1];
-            $price_transfer     = $extension['pricing']['transfer'][1];
-            $current_currency   = $extension['currencies']['registration'];
+                $price_registration = $extension['pricing']['registration'][1];
+                $price_renew        = $extension['pricing']['renew'][1];
+                $price_transfer     = $extension['pricing']['transfer'][1];
+                $current_currency   = $extension['currencies']['registration'];
 
-            if($current_currency=='TL'){
-                $current_currency='TRY';
-            }elseif(strlen($current_currency)<>3){
-                $current_currency='USD';
-            }
-
-
-
-            if (in_array($params["basecurrency"], array_keys($convertable_currencies))) {
-
-                $exchange_rate = $convertable_currencies[$params["basecurrency"]];
-
-                if ($current_currency == 'USD') {
-                    $price_registration = $price_registration * $exchange_rate;
-                    $price_renew        = $price_renew * $exchange_rate;
-                    $price_transfer     = $price_transfer * $exchange_rate;
+                if($current_currency=='TL'){
+                    $current_currency='TRY';
+                }elseif(strlen($current_currency)<>3){
+                    $current_currency='USD';
                 }
 
-                if($current_currency=='TRY'){
-                    $price_registration = $price_registration * $exchange_rate/$convertable_currencies['TRY'];
-                    $price_renew        = $price_renew * $exchange_rate/$convertable_currencies['TRY'];
-                    $price_transfer     = $price_transfer * $exchange_rate/$convertable_currencies['TRY'];
+
+
+                if (in_array($params["basecurrency"], array_keys($convertable_currencies))) {
+
+                    $exchange_rate = $convertable_currencies[$params["basecurrency"]];
+
+                    if ($current_currency == 'USD') {
+                        $price_registration = $price_registration * $exchange_rate;
+                        $price_renew        = $price_renew * $exchange_rate;
+                        $price_transfer     = $price_transfer * $exchange_rate;
+                    }
+
+                    if($current_currency=='TRY'){
+                        $price_registration = $price_registration * $exchange_rate/$convertable_currencies['TRY'];
+                        $price_renew        = $price_renew * $exchange_rate/$convertable_currencies['TRY'];
+                        $price_transfer     = $price_transfer * $exchange_rate/$convertable_currencies['TRY'];
+                    }
+
+                    $current_currency   = $params["basecurrency"];
                 }
+                $tlds[] = $extension['tld'];
 
-                $current_currency   = $params["basecurrency"];
+                $item      = (new ImportItem)->setExtension(trim($extension['tld']))
+                                             ->setMinYears($extension['minperiod'])
+                                             ->setMaxYears($extension['maxperiod'])
+                                             ->setRegisterPrice($price_registration)
+                                             ->setRenewPrice($price_renew)
+                                             ->setTransferPrice($price_transfer)
+                                             ->setCurrency($current_currency);
+
+
+                $results[] = $item;
+
             }
-
-            $item      = (new ImportItem)->setExtension($extension['tld'])
-                                         ->setMinYears($extension['minperiod'])
-                                         ->setMaxYears($extension['maxperiod'])
-                                         ->setRegisterPrice($price_registration)
-                                         ->setRenewPrice($price_renew)
-                                         ->setTransferPrice($price_transfer)
-                                         ->setCurrency($current_currency);
-            $results[] = $item;
-
         }
     }
-
 
     return $results;
 }
