@@ -1302,7 +1302,7 @@ function domainnameapi_parse_trcontact($contactDetails) {
         'TRABISDOMAINCATEGORY' => strlen($contactDetails['companyname']) > 0 ? '0' : '1',
         'TRABISNAMESURNAME'    => $contactDetails['firstname'] . ' ' . $contactDetails['lastname'],
         'TRABISCOUNTRYID'      => 215,
-        'TRABISCITIYID'        => 34,
+        'TRABISCITYID'        => 34,
         'TRABISCOUNTRYNAME'    => $contactDetails['countrycode'],
         'TRABISCITYNAME'       => $contactDetails['city'],
     ];
