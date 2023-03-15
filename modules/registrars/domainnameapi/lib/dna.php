@@ -7,6 +7,11 @@
  * Bünyamin AKÇAY <bunyamin@bunyam.in>
  */
 
+/**
+ * Class DomainNameAPI_PHPLibrary
+ * @package DomainNameApi
+ * @version 2.0.7
+ */
 namespace DomainNameApi;
 
 class DomainNameAPI_PHPLibrary {
