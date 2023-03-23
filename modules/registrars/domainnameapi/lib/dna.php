@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.0.7
+ * @version 2.0.8
  */
 namespace DomainNameApi;
 
