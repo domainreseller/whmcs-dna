@@ -885,7 +885,7 @@ function domainnameapi_GetTldPricing($params) {
 
     $dna = new \DomainNameApi\DomainNameAPI_PHPLibrary($username, $password, $testmode);
 
-    $tldlist = $dna->GetTldList(800);
+    $tldlist = $dna->GetTldList(1000);
 
     $convertable_currencies = domainnameapi_exchangerates();
 
