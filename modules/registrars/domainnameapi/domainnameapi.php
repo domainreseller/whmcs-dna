@@ -1,4 +1,10 @@
 <?php
+/**
+ * Module WHMCS-DNA
+ * @package DomainNameApi
+ * @version 2.0.9
+ */
+
 use WHMCS\Domain\TopLevel\ImportItem;
 use WHMCS\Domains\DomainLookup\ResultsList;
 use WHMCS\Domains\DomainLookup\SearchResult;
@@ -483,10 +489,10 @@ function domainnameapi_GetContactDetails($params) {
     if($result["result"] == "OK")
     {
         $values = [
-            'Registrant Contact'=>domainnameapi_parse_contact($result["data"]["contacts"]["Registrant"]),
-            'Administrative Contact'=>domainnameapi_parse_contact($result["data"]["contacts"]["Administrative"]),
-            'Billing Contact'=>domainnameapi_parse_contact($result["data"]["contacts"]["Billing"]),
-            'Technical Contact'=>domainnameapi_parse_contact($result["data"]["contacts"]["Technical"]),
+            'RegistrantContact'=>domainnameapi_parse_contact($result["data"]["contacts"]["Registrant"]),
+            'AdministrativeContact'=>domainnameapi_parse_contact($result["data"]["contacts"]["Administrative"]),
+            'BillingContact'=>domainnameapi_parse_contact($result["data"]["contacts"]["Billing"]),
+            'TechnicalContact'=>domainnameapi_parse_contact($result["data"]["contacts"]["Technical"]),
         ];
 
     }
@@ -524,10 +530,10 @@ function domainnameapi_SaveContactDetails($params) {
     // DOMAIN NAME
         $params["sld"].".".$params["tld"],
         [
-            "Administrative" => domainnameapi_parse_clientinfo($params["contactdetails"]["Administrative Contact"]),
-            "Billing" =>domainnameapi_parse_clientinfo($params["contactdetails"]["Billing Contact"]),
-            "Technical" =>domainnameapi_parse_clientinfo($params["contactdetails"]["Technical Contact"]),
-            "Registrant" => domainnameapi_parse_clientinfo($params["contactdetails"]["Registrant Contact"])
+            "Administrative" => domainnameapi_parse_clientinfo($params["contactdetails"]["AdministrativeContact"]),
+            "Billing" =>domainnameapi_parse_clientinfo($params["contactdetails"]["BillingContact"]),
+            "Technical" =>domainnameapi_parse_clientinfo($params["contactdetails"]["TechnicalContact"]),
+            "Registrant" => domainnameapi_parse_clientinfo($params["contactdetails"]["RegistrantContact"])
 
         ]
     );
