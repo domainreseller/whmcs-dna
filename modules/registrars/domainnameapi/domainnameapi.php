@@ -2,14 +2,14 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.0.9
+ * @version 2.0.10
  */
 
-use WHMCS\Domain\TopLevel\ImportItem;
-use WHMCS\Domains\DomainLookup\ResultsList;
-use WHMCS\Domains\DomainLookup\SearchResult;
-use WHMCS\Module\Registrar\Registrarmodule\ApiClient;
-use WHMCS\Database\Capsule;
+use \WHMCS\Domain\TopLevel\ImportItem;
+use \WHMCS\Domains\DomainLookup\ResultsList;
+use \WHMCS\Domains\DomainLookup\SearchResult;
+use \WHMCS\Module\Registrar\Registrarmodule\ApiClient;
+use \WHMCS\Database\Capsule;
 
 
 function domainnameapi_getConfigArray($params) {
@@ -804,12 +804,102 @@ function domainnameapi_CheckAvailability($params) {
     $tldslist = $params['tldsToInclude'];
     $premiumEnabled = (bool) $params['premiumEnabled'];
     $domainslist = [];
-    $results = new ResultsList();
+    $results = new \WHMCS\Domains\DomainLookup\ResultsList();
 
 
     $result=null;
 
 
+
+    $all_tlds = [];
+    foreach ($tldslist as $k => $v) {
+        $all_tlds[]=ltrim($v,'.');
+    }
+
+
+    //$tld=str_replace(".","",$domain['tld']);
+    $result = $dna->CheckAvailability([$label],$all_tlds,"1","create");
+
+    $exchange_rates = domainnameapi_exchangerates();
+
+
+    foreach ($result as $k => $v) {
+        $searchResult = new SearchResult($label, '.'.$v['TLD']);
+
+        $register_price = $v['Price'];
+        $renew_price = $v['Price'];
+
+        if(strpos($v['TLD'],'.tr' ) !== false){
+            $register_price = $register_price / $exchange_rates['TRY'];
+            $renew_price = $renew_price / $exchange_rates['TRY'];
+        }
+
+
+
+        if ($v['Status'] == 'available') {
+
+            $status = SearchResult::STATUS_NOT_REGISTERED;
+            $searchResult->setStatus($status);
+
+            if ($v['IsFee'] == '1') {
+                $searchResult->setPremiumDomain(true);
+                $searchResult->setPremiumCostPricing([
+                        'register'     => $register_price,
+                        'renew'        => $renew_price,
+                        'CurrencyCode' => 'USD',
+                    ]);
+            }
+
+        }else{
+            $status = SearchResult::STATUS_REGISTERED;
+            $searchResult->setStatus($status);
+        }
+      $results->append($searchResult);
+    }
+
+
+
+
+
+    logModuleCall("domainnameapi",
+        substr(__FUNCTION__, 14),
+        $dna->getRequestData(),
+        $dna->getResponseData(),
+        $values,
+        [$username,$password]
+    );
+
+
+    return $results;
+
+
+
+}
+
+function domainnameapi_GetDomainSuggestions($params) {
+    require_once __DIR__.'/lib/dna.php';
+
+    $username = $params["API_UserName"];
+    $password = $params["API_Password"];
+    $testmode = $params["API_TestMode"];
+
+
+    $values=[];
+
+    $dna = new \DomainNameApi\DomainNameAPI_PHPLibrary($username,$password,$testmode);
+
+    if($params['isIdnDomain']){
+        $label = empty($params['punyCodeSearchTerm']) ? strtolower($params['searchTerm']) : strtolower($params['punyCodeSearchTerm']);
+    }else{
+        $label = strtolower($params['searchTerm']);
+    }
+
+    $tldslist = $params['tldsToInclude'];
+    $premiumEnabled = (bool) $params['premiumEnabled'];
+    $domainslist = [];
+    $results = new \WHMCS\Domains\DomainLookup\ResultsList();
+
+    $result=null;
 
     $all_tlds = [];
     foreach ($tldslist as $k => $v) {
