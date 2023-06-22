@@ -1,0 +1,30 @@
+{
+  "schema": "1.0",
+  "type": "whmcs-registrars",
+  "name": "domainnameapi",
+  "license": "proprietary",
+  "category": "domains",
+  "description": {
+    "name": "DomainNameApi",
+    "tagline": "A leading reseller domain registrar supporting over 20 million domains.",
+    "long": "## Apply for an account\nWHMCS users get exclusive access to signup with no setup fees and preferential pricing. [Learn more and signup &raquo;](https://www.domainnameapi.com/become-a-reseller)",
+    "features": [
+      "Automated Domain Registrations, Transfers & Renewals",
+      "Ability to View/Change Nameservers & WHOIS Info",
+      "Domain Locking, ID Protection, EPP Code Retrieval"
+    ]
+  },
+  "logo": {
+    "filename": "logo.png"
+  },
+  "support": {
+    "homepage": "https:\/\/www.domainnameapi.com\/",
+    "docs_url": "https:\/\/www.domainnameapi.com\/whmcs"
+  },
+  "authors": [
+    {
+      "name": "Bünyamin AKÇAY",
+      "homepage": "https:\/\/github.com\/bakcay"
+    }
+  ]
+}
