@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.0.11
+ * @version 2.0.12
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
@@ -117,10 +117,10 @@ function domainnameapi_getConfigArray($params) {
                 'Options'      => [
                     'no'  => 'Do Not Convert',
                     'TRY' => 'to TRY',
-                    //'IRR' => 'to IRR',
-                    //'PKR' => 'to PKR',
+                    'IRR' => 'to IRR',
+                    'PKR' => 'to PKR',
                 ],
-                'Description'  => 'Base Currency Convertion. <br>If your base currency is not USD, please select your base currency. <br>Exchange rates  based on <a href="https://www.tcmb.gov.tr/kurlar/today.xml">TCMB</a> Due to currency fluctuations; the exchange rate may be different from the actual exchange rate , prices may vary over time.',
+                'Description'  => 'Base Currency Convertion. <br><b>Strongly advice to not use this feature</b>. Using this feature means that you have read and fully understood the  <a href="https://github.com/domainreseller/whmcs-dna/blob/main/DISCLAIMER.md" target="_blank">DISCLAIMER AND WAIVER OF LIABILITY</a>'
             ],
         ];
     } else {
@@ -998,30 +998,26 @@ function domainnameapi_GetTldPricing($params) {
 
                 if($current_currency=='TL'){
                     $current_currency='TRY';
-                }elseif(strlen($current_currency)<>3){
-                    $current_currency='USD';
                 }
 
 
+                if (in_array($params["basecurrency"],array_keys($convertable_currencies) )) {
 
-                if (in_array($params["basecurrency"], array_keys($convertable_currencies))) {
-
-                    $exchange_rate = $convertable_currencies[$params["basecurrency"]];
+                    $exchange_rate     = $convertable_currencies[$params["basecurrency"]];
+                    $exchange_rate_rev = $convertable_currencies['TRY'];
 
                     if ($current_currency == 'USD') {
-                        $price_registration = $price_registration * $exchange_rate;
-                        $price_renew        = $price_renew * $exchange_rate;
-                        $price_transfer     = $price_transfer * $exchange_rate;
+                        $exchange_rate_rev = 1;
                     }
 
-                    if($current_currency=='TRY'){
-                        $price_registration = $price_registration * $exchange_rate/$convertable_currencies['TRY'];
-                        $price_renew        = $price_renew * $exchange_rate/$convertable_currencies['TRY'];
-                        $price_transfer     = $price_transfer * $exchange_rate/$convertable_currencies['TRY'];
-                    }
+                    $price_registration = $price_registration * $exchange_rate / $exchange_rate_rev;
+                    $price_renew        = $price_renew * $exchange_rate / $exchange_rate_rev;
+                    $price_transfer     = $price_transfer * $exchange_rate / $exchange_rate_rev;
 
                     $current_currency   = $params["basecurrency"];
                 }
+
+
                 $tlds[] = $extension['tld'];
 
                 $item      = (new ImportItem)->setExtension(trim($extension['tld']))
@@ -1031,7 +1027,6 @@ function domainnameapi_GetTldPricing($params) {
                                              ->setRenewPrice($price_renew)
                                              ->setTransferPrice($price_transfer)
                                              ->setCurrency($current_currency);
-
 
                 $results[] = $item;
 
@@ -1422,17 +1417,41 @@ function domainnameapi_parse_trcontact($contactDetails) {
 
 function domainnameapi_parse_cache($key,$ttl,$callback){
 
-    $file_name = __DIR__.'/cache/'.md5($key).'.cache';
+    $cache_key = "domainnameapi_{$key}";
 
-    if(file_exists($file_name) && filemtime($file_name) > (time() - $ttl)){
-        return unserialize(file_get_contents($file_name));
-    }else{
-        $data = $callback();
-        file_put_contents($file_name,serialize($data));
-        return $data;
+    $token_row = Capsule::table('tblconfiguration')
+                        ->where('setting', $cache_key)
+                        ->first();
+
+    //if module newly installed, create token row
+    if (!isset($token_row)) {
+        Capsule::table('tblconfiguration')
+               ->insert([
+                   'setting' => $cache_key,
+                   'value'   => ''
+               ]);
     }
+
+    if (strtotime($token_row->updated_at) < (time() - 600)) {
+
+        $data = $callback();
+
+        Capsule::table('tblconfiguration')
+               ->where('setting', $cache_key)
+               ->update([
+                   'value'      => serialize($data),
+                   'updated_at' => date('Y-m-d H:i:s', strtotime("+{$ttl} seconds"))
+               ]);
+
+        return $data;
+
+    }else{
+        return unserialize($token_row->value);
+    }
+
 }
 
+/*
 function domainnameapi_exchangerates() {
     $url   = 'https://www.tcmb.gov.tr/kurlar/today.xml';
     $xml   = simplexml_load_file($url);
@@ -1460,6 +1479,34 @@ function domainnameapi_exchangerates() {
     $rates['TRY'] = $rates['USD'];
     unset($rates['USD']);
     unset($rates['XDR']);
+    return $rates;
+}
+*/
+
+function domainnameapi_exchangerates() {
+    $rates = [];
+
+    $rates = domainnameapi_parse_cache('currency_data', 1800, function () {
+
+        $url = 'https://open.er-api.com/v6/latest/USD';
+        $ch  = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        $json = curl_exec($ch);
+        curl_close($ch);
+        $data = json_decode($json);
+
+        if (!isset($data->rates)) {
+            throw new Exception('Error: Exchange service is not available . Please Wait few minutes and try again. ');
+        }
+
+        return $data->rates;
+    });
+
+
+    $rates = json_decode(json_encode($rates), true);
+
+
     return $rates;
 }
 
