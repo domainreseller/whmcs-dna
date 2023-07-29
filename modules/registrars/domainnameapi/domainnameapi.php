@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.0.12
+ * @version 2.0.13
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
@@ -118,7 +118,10 @@ function domainnameapi_getConfigArray($params) {
                     'no'  => 'Do Not Convert',
                     'TRY' => 'to TRY',
                     'IRR' => 'to IRR',
+                    'INR' => 'to INR',
                     'PKR' => 'to PKR',
+                    'CNY' => 'to CNY',
+                    'AED' => 'to AED',
                 ],
                 'Description'  => 'Base Currency Convertion. <br><b>Strongly advice to not use this feature</b>. Using this feature means that you have read and fully understood the  <a href="https://github.com/domainreseller/whmcs-dna/blob/main/DISCLAIMER.md" target="_blank">DISCLAIMER AND WAIVER OF LIABILITY</a>'
             ],
