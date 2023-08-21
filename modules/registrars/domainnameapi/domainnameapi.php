@@ -117,6 +117,7 @@ function domainnameapi_getConfigArray($params) {
                 'Options'      => [
                     'no'  => 'Do Not Convert',
                     'TRY' => 'to TRY',
+                    'EUR' => 'to EUR',
                     'IRR' => 'to IRR',
                     'INR' => 'to INR',
                     'PKR' => 'to PKR',

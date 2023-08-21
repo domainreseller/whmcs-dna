@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.0.10
+ * @version 2.0.12
  */
 
 /*
@@ -173,12 +173,22 @@ class DomainNameAPI_PHPLibrary {
     /**
      * Get Current primary Balance for your account
      */
-    public function GetCurrentBalance() {
+    public function GetCurrentBalance($CurrencyId = 2) {
+
+        if(strtoupper($CurrencyId) == 'USD'){
+            $CurrencyId = 2;
+        }elseif (in_array(strtoupper($CurrencyId), ['TRY','TL','1'])) {
+            $CurrencyId = 1;
+        }else{
+            $CurrencyId = 2;
+        }
+
+
         $parameters = [
             "request" => [
                 "Password"       => $this->_USERDATA_PASSWORD,
                 "UserName"       => $this->_USERDATA_USERNAME,
-                'CurrencyId'=>2
+                'CurrencyId' => $CurrencyId
             ]
         ];
 
