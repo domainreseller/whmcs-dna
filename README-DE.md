@@ -137,22 +137,22 @@ Weitere Informationen finden Sie unter: <a href="https://docs.whmcs.com/Registra
 
 ## Tests
 
-| Testname        | GTLD | TRTLD |
-|-----------------|------|-------|
-| Registrierung   | ✓    | ✓     |
-| Transfer        | ✓    | ✓     |
-| Verlängerung    | ✓    | ✓     |
-| Nameserver      | ✓    | ✓     |
-| RegistrarLock   | ✓    | ✓     |
-| Kontakt         | ✓    | ✓     |
-| EPP             | ✓    | ✓     |
-| Löschen         | ✓    | ✓     |
-| SubNameserver   | ✓    | ✓     |
-| Verfügbarkeit   | ✓    | ✓     |
-| Preissynchronisierung | ✓ | ✓ |
-| Transferabbrechen | ✓ | ✓   |
-| Synchronisierung | ✓ | ✓    |
-| Transfersynchronisierung | ✓ | ✓ |
+| Testname                 | GTLD | TRTLD |
+|--------------------------|------|-------|
+| Registrierung            | ✓    | ✓     |
+| Transfer                 | ✓    | ✓     |
+| Verlängerung             | ✓    | ✓     |
+| Nameserver               | ✓    | ✓     |
+| RegistrarLock            | ✓    | ✓     |
+| Kontakt                  | ✓    | ✓     |
+| EPP                      | ✓    | ✓     |
+| Löschen                  | ✓    | ✓     |
+| SubNameserver            | ✓    | ✓     |
+| Verfügbarkeit            | ✓    | ✓     |
+| Preissynchronisierung    | ✓    | ✓     |
+| Transferabbrechen        | ✓    | ✓     |
+| Synchronisierung         | ✓    | ✓     |
+| Transfersynchronisierung | ✓    | ✓     |
 
 ## Fehlerbehebung
 
@@ -163,3 +163,17 @@ Weitere Informationen finden Sie unter: <a href="https://docs.whmcs.com/Registra
 
 - Ich erhalte den Fehler "Parsing WSDL: Couldn't load from..."
 - Es scheint ein Netzwerkproblem vorzuliegen. Die IP-Adresse Ihres Servers könnte vom Register blockiert sein. Kontaktieren Sie uns zur Lösung.
+
+
+## Rückgabe- und Fehlercodes mit Erklärungen
+
+| Code | Erklärung                                       | Details                                                                                                                                                                         |
+|------|-------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1000 | Command completed successfully                  | Befehl erfolgreich ausgeführt                                                                                                                                                   |
+| 1001 | Command completed successfully; action pending. | Befehl erfolgreich ausgeführt; Aktion ausstehend                                                                                                                                |
+| 2003 | Required parameter missing                      | Erforderlicher Parameter fehlt. Zum Beispiel: Telefonnummer in den Kontaktdaten fehlt                                                                                           |
+| 2105 | Object is not eligible for renewal              | Objekt ist nicht zur Verlängerung berechtigt, Update-Aktionen gesperrt. Der Status darf nicht "clientupdateprohibited" sein. Möglicherweise aufgrund anderer Statusbedingungen. |
+| 2200 | Authentication error                            | Authentifizierungsfehler, Berechtigungscode ungültig oder Domain ist bei einem anderen Registrar registriert.                                                                   |
+| 2302 | Object exists                                   | Domänenname oder Nameserver-Informationen sind bereits in der Datenbank vorhanden. Kann nicht registriert werden.                                                               |
+| 2303 | Object does not exist                           | Domänenname oder Nameserver-Informationen sind in der Datenbank nicht vorhanden. Neue Registrierung erforderlich.                                                               |
+| 2304 | Object status prohibits operation               | Objektstatus verbietet die Aktion, Updates gesperrt. Der Status darf nicht "clientupdateprohibited" sein. Möglicherweise aufgrund anderer Statusbedingungen.                    |

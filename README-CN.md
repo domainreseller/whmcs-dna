@@ -146,3 +146,17 @@ _**如果你是在升级，请在安装之前备份旧文件。**_
 
 - 我收到错误消息 "Parsing WSDL: Couldn't load from..."
 - 看起来是网络问题。你的服务器 IP 地址可能被注册局阻止。请联系我们以解决问题。
+
+
+## 返回和错误代码，说明
+
+| 代码   | 说明                                              | 详细信息                                                             |
+|------|-------------------------------------------------|------------------------------------------------------------------|
+| 1000 | Command completed successfully                  | 命令成功完成                                                           |
+| 1001 | Command completed successfully; action pending. | 命令成功完成；操作待处理                                                     |
+| 2003 | Required parameter missing                      | 必需的参数缺失。例如：联系信息中缺少电话号码等                                          |
+| 2105 | Object is not eligible for renewal              | 对象不适合续订，已锁定更新操作。状态不能为"clientupdateprohibited"。可能是由其他状态引起的。       |
+| 2200 | Authentication error                            | 认证错误，权限码错误或域名已在其他注册公司中。                                          |
+| 2302 | Object exists                                   | 域名或名称服务器信息已存在于数据库中，无法注册。                                         |
+| 2303 | Object does not exist                           | 域名或名称服务器信息在数据库中不存在，需要创建新的注册。                                     |
+| 2304 | Object status prohibits operation               | 对象状态禁止操作，无法更新，已锁定更新操作。状态不能为"clientupdateprohibited"。可能是由其他状态引起的。 |

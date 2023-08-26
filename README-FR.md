@@ -140,22 +140,22 @@ Pour plus d'informations : <a href="https://docs.whmcs.com/Registrar_TLD_Sync">S
 
 ## Tests
 
-| Nom du test    | GTLD | TRTLD |
-|----------------|------|-------|
-| Enregistrement | ✓    | ✓     |
-| Transfert      | ✓    | ✓     |
-| Renouvellement | ✓    | ✓     |
-| Serveur de noms| ✓    | ✓     |
-| Verrou du registrar | ✓ | ✓     |
-| Contact        | ✓    | ✓     |
-| EPP            | ✓    | ✓     |
-| Supprimer      | ✓    | ✓     |
-| Sous-domaine   | ✓    | ✓     |
-| Disponibilité  | ✓    | ✓     |
-| Synchronisation des prix | ✓ | ✓ |
-| Annuler le transfert | ✓    | ✓     |
-| Synchronisation | ✓    | ✓     |
-| Synchronisation du transfert | ✓ | ✓ |
+| Nom du test                  | GTLD | TRTLD |
+|------------------------------|------|-------|
+| Enregistrement               | ✓    | ✓     |
+| Transfert                    | ✓    | ✓     |
+| Renouvellement               | ✓    | ✓     |
+| Serveur de noms              | ✓    | ✓     |
+| Verrou du registrar          | ✓    | ✓     |
+| Contact                      | ✓    | ✓     |
+| EPP                          | ✓    | ✓     |
+| Supprimer                    | ✓    | ✓     |
+| Sous-domaine                 | ✓    | ✓     |
+| Disponibilité                | ✓    | ✓     |
+| Synchronisation des prix     | ✓    | ✓     |
+| Annuler le transfert         | ✓    | ✓     |
+| Synchronisation              | ✓    | ✓     |
+| Synchronisation du transfert | ✓    | ✓     |
 
 ## Dépannage
 - J'ai déjà ajouté de nouveaux champs personnalisés mais je ne peux pas les voir dans les paramètres.
@@ -164,3 +164,17 @@ Pour plus d'informations : <a href="https://docs.whmcs.com/Registrar_TLD_Sync">S
 
 - J'ai obtenu une erreur "Parsing WSDL: Couldn't load from..."
 - Il semble y avoir un problème de réseau. L'adresse IP de votre serveur peut être bloquée par le registre. Contactez-nous pour résoudre le problème.
+
+
+## Codes de Retour et d'Erreur avec Explications
+
+| Code | Explication                                     | Détails                                                                                                                                                                                             |
+|------|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1000 | Command completed successfully                  | Commande exécutée avec succès                                                                                                                                                                       |
+| 1001 | Command completed successfully; action pending. | Commande exécutée avec succès ; action en attente                                                                                                                                                   |
+| 2003 | Required parameter missing                      | Paramètre requis manquant. Par exemple : Numéro de téléphone manquant dans les informations de contact                                                                                              |
+| 2105 | Object is not eligible for renewal              | L'objet n'est pas éligible pour le renouvellement, les actions de mise à jour sont verrouillées. Le statut ne doit pas être "clientupdateprohibited". Peut être dû à d'autres conditions de statut. |
+| 2200 | Authentication error                            | Erreur d'authentification, code d'autorisation incorrect, ou le domaine est enregistré chez un autre registrar.                                                                                     |
+| 2302 | Object exists                                   | Le nom de domaine ou les informations de serveur de noms existent déjà dans la base de données. Ne peut pas être enregistré.                                                                        |
+| 2303 | Object does not exist                           | Le nom de domaine ou les informations de serveur de noms n'existent pas dans la base de données. Nouvel enregistrement requis.                                                                      |
+| 2304 | Object status prohibits operation               | Le statut de l'objet interdit l'action, les mises à jour sont verrouillées. Le statut ne doit pas être "clientupdateprohibited". Peut être dû à d'autres conditions de statut.                      |

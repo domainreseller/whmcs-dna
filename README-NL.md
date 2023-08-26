@@ -147,3 +147,17 @@ Voor meer informatie: <a href="https://docs.whmcs.com/Registrar_TLD_Sync">Whmcs 
 
 - Ik kreeg de foutmelding "Parsing WSDL: Couldn't load from..."
 - Het lijkt op een netwerkprobleem. Het IP-adres van uw server is mogelijk geblokkeerd door de registry. Neem contact met ons op om het op te lossen.
+
+
+## Terugkeer- en Foutcodes met Uitleg
+
+| Code | Uitleg                                          | Details                                                                                                                                                                     |
+|------|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1000 | Command completed successfully                  | Opdracht succesvol uitgevoerd                                                                                                                                               |
+| 1001 | Command completed successfully; action pending. | Opdracht succesvol uitgevoerd; actie in behandeling                                                                                                                         |
+| 2003 | Required parameter missing                      | Vereiste parameter ontbreekt. Bijvoorbeeld: Ontbrekend telefoonnummer in contactgegevens                                                                                    |
+| 2105 | Object is not eligible for renewal              | Object komt niet in aanmerking voor vernieuwing, update-acties vergrendeld. Status mag niet "clientupdateprohibited" zijn. Kan te wijten zijn aan andere statusvoorwaarden. |
+| 2200 | Authentication error                            | Authenticatiefout, autorisatiecode onjuist of domein is geregistreerd bij een andere registrar.                                                                             |
+| 2302 | Object exists                                   | Domeinnaam of nameserver-informatie bestaat al in de database. Kan niet worden geregistreerd.                                                                               |
+| 2303 | Object does not exist                           | Domeinnaam of nameserver-informatie bestaat niet in de database. Nieuwe registratie vereist.                                                                                |
+| 2304 | Object status prohibits operation               | Objectstatus verbiedt de actie, updates vergrendeld. Status mag niet "clientupdateprohibited" zijn. Kan te wijten zijn aan andere statusvoorwaarden.                        |

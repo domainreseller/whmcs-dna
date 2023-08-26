@@ -145,21 +145,21 @@ Daha ətraflı məlumat üçün : <a href="https://docs.whmcs.com/Registrar_TLD_
 
 
 
-| Test Adı       | GTLD | TRTLD |
-|----------------|------|-------|
-| Qeydiyyat      | ✓    | ✓     |
-| Transfer       | ✓    | ✓     | 
-| Yeniləmə       | ✓    | ✓     | 
-| Nameserver     | ✓    | ✓     | 
-| Qeydiyyatçı Blok | ✓    | ✓     | 
-| Əlaqə           | ✓    | ✓     | 
-| EPP            | ✓    | ✓     | 
-| Silmə          | ✓    | ✓     | 
-| AltNameserver  | ✓    | ✓     | 
-| Əlçatanlıq     | ✓    | ✓     | 
-| Qiymət Sinxronizasiyası  | ✓    | ✓     | 
-| Transfer İmtina | ✓    | ✓     | 
-| Sinxronizasiya | ✓    | ✓     | 
+| Test Adı                | GTLD | TRTLD |
+|-------------------------|------|-------|
+| Qeydiyyat               | ✓    | ✓     |
+| Transfer                | ✓    | ✓     | 
+| Yeniləmə                | ✓    | ✓     | 
+| Nameserver              | ✓    | ✓     | 
+| Qeydiyyatçı Blok        | ✓    | ✓     | 
+| Əlaqə                   | ✓    | ✓     | 
+| EPP                     | ✓    | ✓     | 
+| Silmə                   | ✓    | ✓     | 
+| AltNameserver           | ✓    | ✓     | 
+| Əlçatanlıq              | ✓    | ✓     | 
+| Qiymət Sinxronizasiyası | ✓    | ✓     | 
+| Transfer İmtina         | ✓    | ✓     | 
+| Sinxronizasiya          | ✓    | ✓     | 
 | Transfer Sinxronizasiya | ✓    | ✓     | 
 
 
@@ -170,3 +170,17 @@ Daha ətraflı məlumat üçün : <a href="https://docs.whmcs.com/Registrar_TLD_
 
 - "Parsing WSDL: Couldn't load from..." səhvi alıram.
 - Şəbəkə problemi kimi görünür. Serverinizin İP ünvanı qeydiyyat tərəfindən bloklana bilər. Məsələnin həll edilməsi üçün bizimlə əlaqə saxlayın.
+
+
+## Qayıdış və Səhv Kodları, Təfərrüatları
+
+| Kod   | Açıqlama                                              | Təfərrüat                                                           |
+|-------|-------------------------------------------------------|--------------------------------------------------------------------|
+| 1000  | Command completed successfully                      | Əmr uğurla icra edildi                                              |
+| 1001  | Command completed successfully; action pending.    | Əmr uğurla icra edildi; amal gözlənilir                            |
+| 2003  | Required parameter missing                           | Tələb olunan parametr yoxdur. Məsələn; Əlaqə məlumatlarında telefon qeyd edilməməsi |
+| 2105  | Object is not eligible for renewal                  | Nəqliyyat yenilənməyə layiq deyil, yeniləmə əməliyyatları qapalıdır. "clientupdateprohibited" vəziyyət durumu olmamalıdır. Digər vəziyyət durumlarından səbəb götürə bilər |
+| 2200  | Authentication error                                | Doğrulama səhvi, təhlükəsizlik kodu yanlışdır və ya domen başqa bir qeydiyyat şirkətində mövcuddur |
+| 2302  | Object exists                                       | Domen adı və ya ad server məlumatları verilənlər bazasında mövcuddur. Qeydiyyat edilə bilməz |
+| 2303  | Object does not exist                               | Domen adı və ya ad server məlumatları verilənlər bazasında mövcud deyil. Yeni qeydiyyat yaradılmalıdır |
+| 2304  | Object status prohibits operation                   | Domen vəziyyəti əməliyyat üçün maneə törədir, yeniləmə əməliyyatları qapalıdır. Vəziyyət "clientupdateprohibited" olmamalıdır. Digər vəziyyət durumlarından səbəb götürə bilər |
