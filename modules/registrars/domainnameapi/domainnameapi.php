@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.0.14
+ * @version 2.0.15
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
@@ -46,9 +46,11 @@ function domainnameapi_getConfigArray($params) {
             $testmode = $params["API_TestMode"];
 
 
-           // $sysMsg = domainnameapi_parse_cache('user_'.$username.$password.$testmode, 100, function () use ($username, $password, $testmode) {
+            $sysMsg = domainnameapi_parse_cache('user_'.$username.md5($password).$testmode, 100, function () use ($username, $password, $testmode) {
                 $dna     = new \DomainNameApi\DomainNameAPI_PHPLibrary($username, $password, $testmode);
                 $details = $dna->GetResellerDetails();
+
+                $sysMsg='';
 
                 if ($details['result'] != 'OK') {
                      $sysMsg = "Username and password combination not correct";
@@ -62,7 +64,9 @@ function domainnameapi_getConfigArray($params) {
 
                 }
 
-           // });
+                return $sysMsg;
+
+            });
 
         }
 
