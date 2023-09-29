@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.0.12
+ * @version 2.0.13
  */
 
 /*
@@ -1665,9 +1665,12 @@ class DomainNameAPI_PHPLibrary {
      */
     public function isTrTLD($domain){
         //preg_match('/\.com\.tr|\.net\.tr|\.org\.tr|\.biz\.tr|\.info\.tr|\.tv\.tr|\.gen\.tr|\.web\.tr|\.tel\.tr|\.name\.tr|\.bbs\.tr|\.gov\.tr|\.bel\.tr|\.pol\.tr|\.edu\.tr|\.k12\.tr|\.av\.tr|\.dr\.tr$/', $domain, $result);
-        $_tld = substr($domain,-3);
 
-        return $_tld=='.tr';
+        preg_match('/\.tr$/', $domain, $result);
+
+
+
+        return isset($result[0]);
     }
 
 
