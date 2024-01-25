@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.0.16
+ * @version 2.0.17
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
@@ -14,7 +14,6 @@ use \WHMCS\Database\Capsule;
 
 function domainnameapi_getConfigArray($params) {
     $configarray = [];
-
 
     $customfields = domainnameapi_parse_cache('config_settings', 512, function () {
 
@@ -1425,19 +1424,25 @@ function domainnameapi_parse_trcontact($contactDetails) {
 
 function domainnameapi_parse_cache($key,$ttl,$callback){
 
-    $cache_key = "domainnameapi_{$key}";
+    //Long usernames can cause issues with the tblconfiguration table setting column
+    $cache_key = "domainnameapi_".md5($key); //Exact 46 character
 
     $token_row = Capsule::table('tblconfiguration')
                         ->where('setting', $cache_key)
                         ->first();
 
     //if module newly installed, create token row
-    if (!isset($token_row)) {
-        Capsule::table('tblconfiguration')
-               ->insert([
-                   'setting' => $cache_key,
-                   'value'   => ''
-               ]);
+    //token row could be object pattern or empty, not false
+    if (!isset($token_row->setting)) {
+        try {
+            Capsule::table('tblconfiguration')
+                   ->insert([
+                       'setting' => $cache_key,
+                       'value'   => ''
+                   ]);
+        } catch (\Exception $e) {
+            //throw new Exception('Error: Record enumaration failed.');
+        }
     }
 
     if (strtotime($token_row->updated_at) < (time() - 600)) {
