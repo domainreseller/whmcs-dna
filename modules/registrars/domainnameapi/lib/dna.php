@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.0.13
+ * @version 2.0.22
  */
 
 /*
@@ -19,60 +19,107 @@
  */
 namespace DomainNameApi;
 
-class DomainNameAPI_PHPLibrary {
+use Exception;
+use SoapClient;
+use SoapFault;
 
-    private $_USERDATA_USERNAME = "ownername";
-    private $_USERDATA_PASSWORD = "ownerpass";
-    private $_URL_SERVICE       = "https://whmcs.domainnameapi.com/DomainApi.svc";
-    private $service;
+class DomainNameAPI_PHPLibrary
+{
+    /**
+     * Version of the library
+     */
+    const VERSION = '2.0.22';
 
+    /**
+     * Error reporting enabled
+     */
+    private bool $errorReportingEnabled = true;
+    /**
+     * Error Reporting Will send this sentry endpoint, if errorReportingEnabled is true
+     * This request does not include sensitive informations, sensitive informations are filtered.
+     * @var string $errorReportingDsn
+     */
+    private string $errorReportingDsn = 'https://d4e2d61e4af2d4c68fb21ab93bf51ff2@o4507492369039360.ingest.de.sentry.io/4507492373954640';
 
-    public $__REQUEST  = [];
-    public $__RESPONSE = [];
+    /**
+     * Api Username
+     *
+     * @var string $serviceUsername
+     */
+    private string $serviceUsername = "ownername";
 
+    /*
+     * Api Password
+     * @var string $servicePassword
+     */
+    private string $servicePassword = "ownerpass";
 
-    public function __construct($UserName = "ownername", $Password = "ownerpass", $TestMode = false) {
-
-        self::setCredentials($UserName,$Password);
-        self::useTestMode($TestMode);
-
-        // Create unique connection
-        $this->service = new \SoapClient($this->_URL_SERVICE . "?singlewsdl", [
-            'trace'      => true,
-            "encoding"   => "UTF-8",
-            'features'   => SOAP_SINGLE_ELEMENT_ARRAYS,
-            'debug'      => true,
-            'exceptions' => true,
-        ]);
-
-    }
-
-
-    // METHODS
+    /**
+     * Api Service Soap URL
+     * @var string $serviceUrl
+     */
+    private string $serviceUrl         = "https://whmcs.domainnameapi.com/DomainApi.svc";
+    public  array $lastRequest        = [];
+    public  array $lastResponse       = [];
+    public  array $lastParsedResponse = [];
+    public string $lastFunction       = '';
+    private SoapClient $service;
+    private $startAt;
 
 
     /**
-     * USE TEST PLATFORM OR REAL PLATFORM
-     * if value equals false, use real platform, otherwise use test platform
-     * @param bool $value
+     * DomainNameAPI_PHPLibrary constructor.
+     * @param string $userName
+     * @param string $password
+     * @param bool $testMode
+     * @throws Exception | SoapFault
      */
-    private function useTestMode($value = true) {
-        if ($value === true || $value=='on') {
-            $this->_USERDATA_USERNAME = 'test1.dna@apiname.com';
-            $this->_USERDATA_PASSWORD = 'FsUvpJMzQ69scpqE';
+    public function __construct($userName = "ownername", $password = "ownerpass", $testMode = false)
+    {
+        $this->startAt = microtime(true);
+        self::setCredentials($userName, $password);
+        self::useTestMode($testMode);
+
+        try {
+        // Create unique connection
+            $this->service = new SoapClient($this->serviceUrl . "?singlewsdl", [
+            "encoding"   => "UTF-8",
+            'features'   => SOAP_SINGLE_ELEMENT_ARRAYS,
+            'exceptions' => true,
+                'connection_timeout' => 20,
+        ]);
+        } catch (SoapFault $e) {
+            $this->sendErrorToSentryAsync($e);
+            throw new Exception("SOAP Connection Error: " . $e->getMessage());
+        } catch (Exception $e) {
+            $this->sendErrorToSentryAsync($e);
+            throw new Exception("SOAP Error: " . $e->getMessage());
         }
     }
 
 
     /**
+     * Deprecated
+     * @param bool $value
+     */
+    private function useTestMode($value = true) {
+        //if ($value === true || $value == 'on') {
+        //    $this->serviceUsername = 'test1.dna@apiname.com';
+        //    $this->servicePassword = 'FsUvpJMzQ69scpqE';
+        //}
+    }
+
+
+    /**
      * SET Username and Password
-     * @param $UserName
-     * @param $Password
+     * @param $userName
+     * @param $password
      * @return void
      */
-    private function setCredentials($UserName, $Password) {
-        $this->_USERDATA_USERNAME = $UserName;
-        $this->_USERDATA_PASSWORD = $Password;
+    private function setCredentials($userName, $password)
+    {
+        $this->serviceUsername = $userName;
+        $this->servicePassword = $password;
     }
 
 
@@ -81,15 +128,16 @@ class DomainNameAPI_PHPLibrary {
      * @return array|mixed
      */
     public function getRequestData(){
-        return $this->__REQUEST;
+        return $this->lastRequest;
     }
 
     /**
      * This method sets the last request sent to the API
-     * @return array|mixed
+     * @return DomainNameAPI_PHPLibrary
      */
     public function setRequestData($request){
-        $this->__REQUEST = $request;
+        $this->lastRequest = $request;
+        return $this;
     }
 
     /**
@@ -97,15 +145,226 @@ class DomainNameAPI_PHPLibrary {
      * @return array|mixed
      */
     public function getResponseData(){
-        return $this->__RESPONSE;
+        return $this->lastResponse;
     }
 
     /**
      * This method sets the last response from the API
      * @return array|mixed
      */
-    public function setResponseData($response){
-        $this->__RESPONSE = $response;
+    public function setResponseData($response)
+    {
+        $this->lastResponse = $response;
+        return $this;
+    }
+
+    /**
+     * This method returns the last parsed response from the API
+     * @return array|mixed
+     */
+    public function getParsedResponseData()
+    {
+        return $this->lastParsedResponse;
+    }
+
+    /**
+     * This method sets the last parsed response from the API
+     * @return array|mixed
+     */
+    public function setParsedResponseData($response)
+    {
+        $this->lastParsedResponse = $response;
+        return $this;
+    }
+
+    /**
+     * This method returns the last function called
+     * @return string
+     */
+    public function getLastFunction()
+    {
+        return $this->lastFunction;
+    }
+
+    /**
+     * This method sets the last function called
+     * @return DomainNameAPI_PHPLibrary
+     */
+    public function setLastFunction($function)
+    {
+        $this->lastFunction = $function;
+        return $this;
+    }
+
+    public function getServiceUrl()
+    {
+        return $this->serviceUrl;
+    }
+
+    public function setServiceUrl($url)
+    {
+        $this->serviceUrl = $url;
+    }
+
+
+    /**
+     * This method sends anonymous error data to the Sentry server, if error reporting is enabled
+     *
+     * @return void
+     */
+    private function sendErrorToSentryAsync(Exception $e)
+    {
+        if (!$this->errorReportingEnabled) {
+            return;
+        }
+
+        $skipped_errors = [
+            'Domain not found',
+            'ERR_DOMAIN_NOT_FOUND',
+            'Reseller not found'
+        ];
+
+        foreach ($skipped_errors as $ek => $ev) {
+            if(strpos($e->getMessage(),$ev) !== false){
+                return ;
+            }
+        }
+
+        $elapsed_time = microtime(true) - $this->startAt;
+        $parsed_dsn = parse_url($this->errorReportingDsn);
+
+        // API URL'si
+        $host       = $parsed_dsn['host'];
+        $project_id = ltrim($parsed_dsn['path'], '/');
+        $public_key = $parsed_dsn['user'];
+        $secret_key = $parsed_dsn['pass'] ?? null;
+        $api_url    = "https://$host/api/$project_id/store/";
+
+        $external_ip = $this->getServerIp();
+
+
+
+        // Hata verisi
+        $errorData = [
+            'event_id'  => bin2hex(random_bytes(16)),
+            'timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
+            'level'     => 'error',
+            'logger'    => 'php',
+            'platform'  => 'php',
+            'culprit'   => __FILE__,
+            'message'   => [
+                'formatted' => $e->getMessage()
+            ],
+            'exception' => [
+                'values' => [
+                    [
+                        'type'       =>  str_replace(['DomainNameApi\DomainNameAPI_PHPLibrary'],['DNALib Exception'],self::class),
+                        'value'      => $e->getMessage(),
+                        'stacktrace' => [
+                            'frames' => [
+                                [
+                                    'filename' => $e->getFile(),
+                                    'lineno'   => $e->getLine(),
+                                    'function' => str_replace([dirname(__DIR__),'DomainNameApi\DomainNameAPI_PHPLibrary'],['.','Lib'],$e->getTraceAsString()),
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ],
+            'tags'      => [
+                'handled'         => 'yes',
+                'level'           => 'error',
+                'release'         => self::VERSION,
+                'environment'     => 'production',
+                'url'             => $_SERVER['REQUEST_URI'] ?? 'unknown',
+                'transaction'     => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+                'status_code'     => http_response_code(),
+                'trace_id'        => bin2hex(random_bytes(8)), // Trace ID örneği
+                'runtime_name'    => 'PHP',
+                'runtime_version' => phpversion(),
+                'ip_address'      => $external_ip,
+                'elapsed_time'    => number_format($elapsed_time, 4),
+
+            ],
+            'extra'     => [
+                'request_data'  => $this->getRequestData(),
+                'response_data' => $this->getResponseData(),
+            ]
+        ];
+
+        // Sentry başlığı
+        $sentry_auth = [
+            'sentry_version=7',
+            'sentry_client=whmcslib-php/' . self::VERSION,
+            "sentry_key=$public_key"
+        ];
+        if ($secret_key) {
+            $sentry_auth[] = "sentry_secret=$secret_key";
+        }
+        $sentry_auth_header = 'X-Sentry-Auth: Sentry ' . implode(', ', $sentry_auth);
+
+        if(function_exists('escapeshellarg') && function_exists('exec')){
+            $cmd = 'curl -X POST ' . escapeshellarg($api_url) . ' -H ' . escapeshellarg('Content-Type: application/json') . ' -H ' . escapeshellarg($sentry_auth_header) . ' -d ' . escapeshellarg(json_encode($errorData)) . ' > /dev/null 2>&1 &';
+            exec($cmd);
+        }else{
+             $jsonData = json_encode($errorData);
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $api_url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+                curl_setopt($ch, CURLOPT_POST, 1);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Content-Type: application/json',
+                    $sentry_auth_header
+                ]);
+                curl_exec($ch);
+                curl_close($ch);
+        }
+    }
+
+    private function getServerIp()
+    {
+        $cache_ttl    = 512; // Cache süresi 512 saniye
+        $cache_key    = 'external_ip';
+        $cache_file   = __DIR__ . '/ip_addr.cache';
+        $current_time = time();
+
+        if (function_exists('apcu_fetch')) {
+            // APCu ile cache kontrolü
+            $external_ip = apcu_fetch($cache_key);
+            if ($external_ip !== false) {
+                return $external_ip;
+            }
+        } elseif (file_exists($cache_file) && ($current_time - filemtime($cache_file) < $cache_ttl)) {
+            // Dosya ile cache kontrolü
+            return file_get_contents($cache_file);
+        }
+
+        // IP adresini alma ve cacheleme
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, "http://ipecho.net/plain");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+            $external_ip = curl_exec($ch);
+            curl_close($ch);
+
+            if ($external_ip !== false) {
+                // APCu ile cachele
+                if (function_exists('apcu_store')) {
+                    apcu_store($cache_key, $external_ip, $cache_ttl);
+                }
+                // Dosya ile cachele
+                file_put_contents($cache_file, $external_ip);
+            }
+
+            return $external_ip;
+        } catch (Exception $e) {
+            return 'unknown';
+        }
     }
 
 
@@ -115,8 +374,8 @@ class DomainNameAPI_PHPLibrary {
     public function GetResellerDetails() {
         $parameters = [
             "request" => [
-                "Password"       => $this->_USERDATA_PASSWORD,
-                "UserName"       => $this->_USERDATA_USERNAME,
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
                 'CurrencyId'=>2 // 1: TRY, 2: USD
             ]
         ];
@@ -135,8 +394,7 @@ class DomainNameAPI_PHPLibrary {
 
                 $active_currency = $data['ResellerInfo']['BalanceInfoList']['BalanceInfo'][0];
                 $balances = [];
-                foreach ($data['ResellerInfo']['BalanceInfoList']['BalanceInfo'] as $k => $v) {
-
+                foreach ($data['ResellerInfo']['BalanceInfoList']['BalanceInfo'] as  $v) {
                     if ($v['CurrencyName'] == $data['ResellerInfo']['CurrencyInfo']['Code']) {
                         $active_currency = $v;
                     }
@@ -173,22 +431,22 @@ class DomainNameAPI_PHPLibrary {
     /**
      * Get Current primary Balance for your account
      */
-    public function GetCurrentBalance($CurrencyId = 2) {
-
-        if(strtoupper($CurrencyId) == 'USD'){
-            $CurrencyId = 2;
-        }elseif (in_array(strtoupper($CurrencyId), ['TRY','TL','1'])) {
-            $CurrencyId = 1;
+    public function GetCurrentBalance($currencyId = 2)
+    {
+        if (strtoupper($currencyId) == 'USD') {
+            $currencyId = 2;
+        } elseif (in_array(strtoupper($currencyId), ['TRY', 'TL', '1'])) {
+            $currencyId = 1;
         }else{
-            $CurrencyId = 2;
+            $currencyId = 2;
         }
 
 
         $parameters = [
             "request" => [
-                "Password"       => $this->_USERDATA_PASSWORD,
-                "UserName"       => $this->_USERDATA_USERNAME,
-                'CurrencyId' => $CurrencyId
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
+                'CurrencyId' => $currencyId
             ]
         ];
 
@@ -215,14 +473,15 @@ class DomainNameAPI_PHPLibrary {
      * @param string $Command
      * @return array
      */
-    public function CheckAvailability($Domains, $TLDs, $Period, $Command) {
+    public function CheckAvailability($domains, $extensions, $period, $Command)
+    {
         $parameters = [
             "request" => [
-                "Password"       => $this->_USERDATA_PASSWORD,
-                "UserName"       => $this->_USERDATA_USERNAME,
-                "DomainNameList" => $Domains,
-                "TldList"        => $TLDs,
-                "Period"         => $Period,
+                "Password"       => $this->servicePassword,
+                "UserName"       => $this->serviceUsername,
+                "DomainNameList" => $domains,
+                "TldList"        => $extensions,
+                "Period"         => $period,
                 "Commad"         => $Command
             ]
         ];
@@ -280,8 +539,8 @@ class DomainNameAPI_PHPLibrary {
 
         $parameters = [
             "request" => [
-                "Password" => $this->_USERDATA_PASSWORD,
-                "UserName" => $this->_USERDATA_USERNAME,
+                "Password" => $this->servicePassword,
+                "UserName" => $this->serviceUsername,
             ]
         ];
 
@@ -316,7 +575,10 @@ class DomainNameAPI_PHPLibrary {
             } else {
                 // Set error
                 $result["result"] = "ERROR";
-                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!");
+                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!",
+                    "Domain info is not a valid array or more than one domain info has returned!");
+
+                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_LIST: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
             }
             return $result;
         });
@@ -337,8 +599,8 @@ class DomainNameAPI_PHPLibrary {
     public function GetTldList($count = 20) {
         $parameters = [
             "request" => [
-                "Password" => $this->_USERDATA_PASSWORD,
-                "UserName" => $this->_USERDATA_USERNAME,
+                "Password"                => $this->servicePassword,
+                "UserName"                => $this->serviceUsername,
                 'IncludePriceDefinitions'=>1,
                 'PageSize'=>$count
             ]
@@ -357,7 +619,7 @@ class DomainNameAPI_PHPLibrary {
             if (isset($data["TldInfoList"]) && is_array($data["TldInfoList"])) {
                 // Parse domain info
 
-                $tlds = [];
+                $extensions = [];
 
                 foreach ($data["TldInfoList"]['TldInfo'] as $k => $v) {
 
@@ -367,7 +629,7 @@ class DomainNameAPI_PHPLibrary {
                         $currencies[strtolower($vp['TradeType'])]=$vp['CurrencyName'];
                     }
 
-                    $tlds[] = [
+                    $extensions[] = [
                         'id'        => $v['Id'],
                         'status'    => $v['Status'],
                         'maxchar'   => $v['MaxCharacterCount'],
@@ -382,7 +644,7 @@ class DomainNameAPI_PHPLibrary {
                 }
 
                 $result=[
-                    'data'=>$tlds,
+                    'data'   => $extensions,
                     'result'=>'OK'
                 ];
 
@@ -392,6 +654,7 @@ class DomainNameAPI_PHPLibrary {
                     'result'=>'ERROR',
                     'error'=>$this->setError("INVALID_TLD_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!")
                 ];
+                $this->sendErrorToSentryAsync(new Exception("INVALID_TLD_LIST: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
             }
 
             return $result;
@@ -403,17 +666,16 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Get Domain details
-     * @param string $DomainName
+     * @param string $domainName
      * @return array
      */
-    public function GetDetails($DomainName) {
-
-
+    public function GetDetails($domainName)
+    {
         $parameters = [
             "request" => [
-                "Password"   => $this->_USERDATA_PASSWORD,
-                "UserName"   => $this->_USERDATA_USERNAME,
-                "DomainName" => $DomainName
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
+                "DomainName" => $domainName
             ]
         ];
 
@@ -432,7 +694,10 @@ class DomainNameAPI_PHPLibrary {
             } else {
                 // Set error
                 $result["result"] = "ERROR";
-                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!");
+                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!",
+                    "Domain info is not a valid array or more than one domain info has returned!");
+
+                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_LIST: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
             }
             return $result;
         });
@@ -446,17 +711,18 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Modify Name Server, Nameservers must be valid array
-     * @param string $DomainName
-     * @param array $NameServers
+     * @param string $domainName
+     * @param array $nameServers
      * @return array
      */
-    public function ModifyNameServer($DomainName, $NameServers) {
+    public function ModifyNameServer($domainName, $nameServers)
+    {
         $parameters = [
             "request" => [
-                "Password"       => $this->_USERDATA_PASSWORD,
-                "UserName"       => $this->_USERDATA_USERNAME,
-                "DomainName"     => $DomainName,
-                "NameServerList" => array_values($NameServers)
+                "Password"       => $this->servicePassword,
+                "UserName"       => $this->serviceUsername,
+                "DomainName"     => $domainName,
+                "NameServerList" => array_values($nameServers)
             ]
         ];
 
@@ -482,15 +748,16 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Enable Theft Protection Lock for domain
-     * @param string $DomainName
+     * @param string $domainName
      * @return array
      */
-    public function EnableTheftProtectionLock($DomainName) {
+    public function EnableTheftProtectionLock($domainName)
+    {
         $parameters = [
             "request" => [
-                "Password"   => $this->_USERDATA_PASSWORD,
-                "UserName"   => $this->_USERDATA_USERNAME,
-                "DomainName" => $DomainName
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
+                "DomainName" => $domainName
             ]
         ];
 
@@ -515,15 +782,16 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Disable Theft Protection Lock for domain
-     * @param string $DomainName
+     * @param string $domainName
      * @return array
      */
-    public function DisableTheftProtectionLock($DomainName) {
+    public function DisableTheftProtectionLock($domainName)
+    {
         $parameters = [
             "request" => [
-                "Password"   => $this->_USERDATA_PASSWORD,
-                "UserName"   => $this->_USERDATA_USERNAME,
-                "DomainName" => $DomainName
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
+                "DomainName" => $domainName
             ]
         ];
 
@@ -543,23 +811,23 @@ class DomainNameAPI_PHPLibrary {
         return $response;
     }
 
-    // CHILD NAMESERVER MANAGEMENT
 
     /**
      * Add Child Name Server for domain
-     * @param string $DomainName
-     * @param string $NameServer
-     * @param string $IPAdresses
+     * @param string $domainName
+     * @param string $nameServer
+     * @param string $ipAddress
      * @return array
      */
-    public function AddChildNameServer($DomainName, $NameServer, $IPAdresses) {
+    public function AddChildNameServer($domainName, $nameServer, $ipAddress)
+    {
         $parameters = [
             "request" => [
-                "Password"        => $this->_USERDATA_PASSWORD,
-                "UserName"        => $this->_USERDATA_USERNAME,
-                "DomainName"      => $DomainName,
-                "ChildNameServer" => $NameServer,
-                "IpAddressList"   => [$IPAdresses]
+                "Password"        => $this->servicePassword,
+                "UserName"        => $this->serviceUsername,
+                "DomainName"      => $domainName,
+                "ChildNameServer" => $nameServer,
+                "IpAddressList"   => [$ipAddress]
             ]
         ];
 
@@ -581,17 +849,18 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Delete Child Name Server for domain
-     * @param string $DomainName
-     * @param string $NameServer
+     * @param string $domainName
+     * @param string $nameServer
      * @return array
      */
-    public function DeleteChildNameServer($DomainName, $NameServer) {
+    public function DeleteChildNameServer($domainName, $nameServer)
+    {
         $parameters = [
             "request" => [
-                "Password"        => $this->_USERDATA_PASSWORD,
-                "UserName"        => $this->_USERDATA_USERNAME,
-                "DomainName"      => $DomainName,
-                "ChildNameServer" => $NameServer
+                "Password"        => $this->servicePassword,
+                "UserName"        => $this->serviceUsername,
+                "DomainName"      => $domainName,
+                "ChildNameServer" => $nameServer
             ]
         ];
 
@@ -614,20 +883,20 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Modify IP of Child Name Server for domain
-     * @param string $DomainName
-     * @param string $NameServer
-     * @param string $IPAdresses
+     * @param string $domainName
+     * @param string $nameServer
+     * @param string $ipAddress
      * @return array
      */
-    public function ModifyChildNameServer($DomainName, $NameServer, $IPAdresses) {
-
+    public function ModifyChildNameServer($domainName, $nameServer, $ipAddress)
+    {
         $parameters = [
             "request" => [
-                "Password"        => $this->_USERDATA_PASSWORD,
-                "UserName"        => $this->_USERDATA_USERNAME,
-                "DomainName"      => $DomainName,
-                "ChildNameServer" => $NameServer,
-                "IpAddressList"   => [$IPAdresses]
+                "Password"        => $this->servicePassword,
+                "UserName"        => $this->serviceUsername,
+                "DomainName"      => $domainName,
+                "ChildNameServer" => $nameServer,
+                "IpAddressList"   => [$ipAddress]
             ]
         ];
 
@@ -653,15 +922,16 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Get Contacts for domain, Administrative, Billing, Technical, Registrant segments will be returned
-     * @param string $DomainName
+     * @param string $domainName
      * @return array
      */
-    public function GetContacts($DomainName) {
+    public function GetContacts($domainName)
+    {
         $parameters = [
             "request" => [
-                "Password"   => $this->_USERDATA_PASSWORD,
-                "UserName"   => $this->_USERDATA_USERNAME,
-                "DomainName" => $DomainName
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
+                "DomainName" => $domainName
             ]
         ];
 
@@ -696,6 +966,7 @@ class DomainNameAPI_PHPLibrary {
                     'error'  => $this->setError("INVALID_CONTACT_INTO", "Invalid response received from server!", "Contact info is not a valid array or more than one contact info has returned!"),
                     'result' => 'ERROR'
                 ];
+                $this->sendErrorToSentryAsync(new Exception("INVALID_CONTACT_INTO: Invalid response received from server! Contact info is not a valid array or more than one contact info has returned!"));
             }
             return $result;
         });
@@ -708,20 +979,21 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Save Contacts for domain, Contacts segments will be saved as Administrative, Billing, Technical, Registrant.
-     * @param string $DomainName
-     * @param array $Contacts
+     * @param string $domainName
+     * @param array $contacts
      * @return array
      */
-    public function SaveContacts($DomainName, $Contacts) {
+    public function SaveContacts($domainName, $contacts)
+    {
         $parameters = [
             "request" => [
-                "Password"              => $this->_USERDATA_PASSWORD,
-                "UserName"              => $this->_USERDATA_USERNAME,
-                "DomainName"            => $DomainName,
-                "AdministrativeContact" => $Contacts["Administrative"],
-                "BillingContact"        => $Contacts["Billing"],
-                "TechnicalContact"      => $Contacts["Technical"],
-                "RegistrantContact"     => $Contacts["Registrant"]
+                "Password"              => $this->servicePassword,
+                "UserName"              => $this->serviceUsername,
+                "DomainName"            => $domainName,
+                "AdministrativeContact" => $contacts["Administrative"],
+                "BillingContact"        => $contacts["Billing"],
+                "TechnicalContact"      => $contacts["Technical"],
+                "RegistrantContact"     => $contacts["Registrant"]
             ]
         ];
 
@@ -741,9 +1013,11 @@ class DomainNameAPI_PHPLibrary {
                 // Set error
                 $result=[
                     'result'=>'ERROR',
-                    'error'=>$this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!")
+                    'error'  => $this->setError("INVALID_CONTACT_SAVE", "Invalid response received from server!",
+                        "Contact info is not a valid array or more than one contact info has returned!")
                 ];
 
+                $this->sendErrorToSentryAsync(new Exception("INVALID_CONTACT_SAVE: Invalid response received from server! Contact info is not a valid array or more than one contact info has returned!"));
             }
             return $result;
         });
@@ -757,23 +1031,24 @@ class DomainNameAPI_PHPLibrary {
     // Start domain transfer (Incoming domain)
     /**
      * Transfer Domain
-     * @param string $DomainName
-     * @param string $AuthCode
-     * @param int $Period
+     * @param string $domainName
+     * @param string $eppCode
+     * @param int $period
      * @return array
      */
-    public function Transfer($DomainName, $AuthCode, $Period) {
+    public function Transfer($domainName, $eppCode, $period)
+    {
         $parameters = [
             "request" => [
-                "Password"             => $this->_USERDATA_PASSWORD,
-                "UserName"             => $this->_USERDATA_USERNAME,
-                "DomainName"           => $DomainName,
-                "AuthCode"             => $AuthCode,
+                "Password"             => $this->servicePassword,
+                "UserName"             => $this->serviceUsername,
+                "DomainName"           => $domainName,
+                "AuthCode"             => $eppCode,
                 'AdditionalAttributes' => [
                     'KeyValueOfstringstring' => [
                         [
                             'Key'   => 'TRANSFERPERIOD',
-                            'Value' => $Period
+                            'Value' => $period
                         ]
                     ]
                 ]
@@ -797,8 +1072,11 @@ class DomainNameAPI_PHPLibrary {
                     // Set error
                     $result=[
                         'result'=>'ERROR',
-                        'data'=>$this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!")
+                    'data'   => $this->setError("INVALID_DOMAIN_TRANSFER_REQUEST",
+                        "Invalid response received from server!",
+                        "Domain info is not a valid array or more than one domain info has returned!")
                     ];
+                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_TRANSFER_REQUEST: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
                 }
             return $result;
         });
@@ -813,14 +1091,15 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Stops Incoming Transfer
-     * @param string $DomainName
+     * @param string $domainName
      */
-    public function CancelTransfer($DomainName) {
+    public function CancelTransfer($domainName)
+    {
         $parameters = [
             "request" => [
-                "Password"   => $this->_USERDATA_PASSWORD,
-                "UserName"   => $this->_USERDATA_USERNAME,
-                "DomainName" => $DomainName
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
+                "DomainName" => $domainName
             ]
         ];
 
@@ -845,15 +1124,16 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Approve Outgoing transfer
-     * @param $DomainName
+     * @param $domainName
      * @return mixed|string[]
      */
-    public function ApproveTransfer($DomainName) {
+    public function ApproveTransfer($domainName)
+    {
         $parameters = [
             "request" => [
-                "Password"   => $this->_USERDATA_PASSWORD,
-                "UserName"   => $this->_USERDATA_USERNAME,
-                "DomainName" => $DomainName
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
+                "DomainName" => $domainName
             ]
         ];
 
@@ -874,15 +1154,16 @@ class DomainNameAPI_PHPLibrary {
     }
     /**
      * Reject Outgoing transfer
-     * @param $DomainName
+     * @param $domainName
      * @return mixed|string[]
      */
-    public function RejectTransfer($DomainName) {
+    public function RejectTransfer($domainName)
+    {
         $parameters = [
             "request" => [
-                "Password"   => $this->_USERDATA_PASSWORD,
-                "UserName"   => $this->_USERDATA_USERNAME,
-                "DomainName" => $DomainName
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
+                "DomainName" => $domainName
             ]
         ];
 
@@ -906,17 +1187,18 @@ class DomainNameAPI_PHPLibrary {
 
     /**
      * Renew domain
-     * @param string $DomainName
-     * @param int $Period
+     * @param string $domainName
+     * @param int $period
      * @return array
      */
-    public function Renew($DomainName, $Period) {
+    public function Renew($domainName, $period)
+    {
         $parameters = [
             "request" => [
-                "Password"   => $this->_USERDATA_PASSWORD,
-                "UserName"   => $this->_USERDATA_USERNAME,
-                "DomainName" => $DomainName,
-                "Period"     => $Period
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
+                "DomainName" => $domainName,
+                "Period"     => $period
             ]
         ];
 
@@ -924,13 +1206,21 @@ class DomainNameAPI_PHPLibrary {
 
             $data = $response[key($response)];
 
+            if (isset($data["ExpirationDate"])) {
             return [
                 'result'=>'OK',
                 'data'=>[
-                    'ExpirationDate'=> $data["ExpirationDate"] ?? null
+                        'ExpirationDate' => $data["ExpirationDate"]
                 ]
             ];
-
+            } else {
+                return [
+                    'result' => 'ERROR',
+                    'error'  => $this->setError("INVALID_DOMAIN_RENEW", "Invalid response received from server!",
+                        "Domain info is not a valid array or more than one domain info has returned!")
+                ];
+                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_RENEW: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
+            }
         });
 
         return $response;
@@ -940,29 +1230,37 @@ class DomainNameAPI_PHPLibrary {
     // Register domain with contact information
     /**
      * Register domain with contact information
-     * @param string $DomainName
-     * @param int $Period
-     * @param array $Contacts
-     * @param array $NameServers
-     * @param bool $TheftProtectionLock
-     * @param bool $PrivacyProtection
+     * @param string $domainName
+     * @param int $period
+     * @param array $contacts
+     * @param array $nameServers
+     * @param bool $eppLock
+     * @param bool $privacyLock
      * @param array $addionalAttributes
      * @return array
      */
-    public function RegisterWithContactInfo($DomainName, $Period, $Contacts, $NameServers = ["dns.domainnameapi.com", "web.domainnameapi.com"],  $TheftProtectionLock = true, $PrivacyProtection = false,$addionalAttributes=[]) {
+    public function RegisterWithContactInfo(
+        $domainName,
+        $period,
+        $contacts,
+        $nameServers = ["dns.domainnameapi.com", "web.domainnameapi.com"],
+        $eppLock = true,
+        $privacyLock = false,
+        $addionalAttributes = []
+    ) {
         $parameters = [
             "request" => [
-                "Password"                => $this->_USERDATA_PASSWORD,
-                "UserName"                => $this->_USERDATA_USERNAME,
-                "DomainName"              => $DomainName,
-                "Period"                  => $Period,
-                "NameServerList"          => $NameServers,
-                "LockStatus"              => $TheftProtectionLock,
-                "PrivacyProtectionStatus" => $PrivacyProtection,
-                "AdministrativeContact"   => $Contacts["Administrative"],
-                "BillingContact"          => $Contacts["Billing"],
-                "TechnicalContact"        => $Contacts["Technical"],
-                "RegistrantContact"       => $Contacts["Registrant"]
+                "Password"                => $this->servicePassword,
+                "UserName"                => $this->serviceUsername,
+                "DomainName"              => $domainName,
+                "Period"                  => $period,
+                "NameServerList"          => $nameServers,
+                "LockStatus"              => $eppLock,
+                "PrivacyProtectionStatus" => $privacyLock,
+                "AdministrativeContact"   => $contacts["Administrative"],
+                "BillingContact"          => $contacts["Billing"],
+                "TechnicalContact"        => $contacts["Technical"],
+                "RegistrantContact"       => $contacts["Registrant"]
             ]
         ];
 
@@ -991,9 +1289,10 @@ class DomainNameAPI_PHPLibrary {
                 // Set error
                 $result = [
                     'result' => 'ERROR',
-                    'error'  => $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!")
+                    'error'  => $this->setError("INVALID_DOMAIN_REGISTER", "Invalid response received from server!",
+                        "Domain info is not a valid array or more than one domain info has returned!")
                 ];
-
+                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_REGISTER: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
             }
             return $result;
 
@@ -1006,31 +1305,30 @@ class DomainNameAPI_PHPLibrary {
     }
 
 
-    // Modify privacy protection status of domain
     /**
      * Modify privacy protection status of domain
-     * @param string $DomainName
-     * @param bool $Status
+     * @param string $domainName
+     * @param bool $status
      * @param string $Reason
      * @return array
      */
-    public function ModifyPrivacyProtectionStatus($DomainName, $Status, $Reason = "Owner request") {
+    public function ModifyPrivacyProtectionStatus($domainName, $status, $Reason = "Owner request")
+    {
         if (trim($Reason) == "") {
             $Reason = "Owner request";
         }
 
         $parameters = [
             "request" => [
-                "Password"       => $this->_USERDATA_PASSWORD,
-                "UserName"       => $this->_USERDATA_USERNAME,
-                "DomainName"     => $DomainName,
-                "ProtectPrivacy" => $Status,
+                "Password"       => $this->servicePassword,
+                "UserName"       => $this->serviceUsername,
+                "DomainName"     => $domainName,
+                "ProtectPrivacy" => $status,
                 "Reason"         => $Reason
             ]
         ];
 
-        $response = self::parseCall(__FUNCTION__, $parameters, function ($response) use ($parameters) {
-
+        return  self::parseCall(__FUNCTION__, $parameters, function ($response) use ($parameters) {
             return [
                 'data'=>[
                     'PrivacyProtectionStatus'=>$parameters["request"]["ProtectPrivacy"]
@@ -1040,28 +1338,25 @@ class DomainNameAPI_PHPLibrary {
         });
 
 
-
-        return $response;
     }
 
 
     /**
      * Sync from registry, domain information will be updated from registry
-     * @param string $DomainName
+     * @param string $domainName
      * @return array
      */
-    public function SyncFromRegistry($DomainName) {
+    public function SyncFromRegistry($domainName)
+    {
         $parameters = [
             "request" => [
-                "Password"   => $this->_USERDATA_PASSWORD,
-                "UserName"   => $this->_USERDATA_USERNAME,
-                "DomainName" => $DomainName
+                "Password"   => $this->servicePassword,
+                "UserName"   => $this->serviceUsername,
+                "DomainName" => $domainName
             ]
         ];
 
-        $response = self::parseCall(__FUNCTION__, $parameters, function ($response) use ($parameters) {
-
-            $result = [];
+        return self::parseCall(__FUNCTION__, $parameters, function ($response) use ($parameters) {
             $data   = $response[key($response)];
 
             // If DomainInfo a valid array
@@ -1075,9 +1370,11 @@ class DomainNameAPI_PHPLibrary {
             } else {
                 // Set error
                 $result = [
-                    'error'  => $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!", "Domain info is not a valid array or more than one domain info has returned!"),
+                    'error'  => $this->setError("INVALID_DOMAIN_SYNC", "Invalid response received from server!",
+                        "Domain info is not a valid array or more than one domain info has returned!"),
                     'result' => 'ERROR'
                 ];
+                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_SYNC: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
             }
 
             return $result;
@@ -1085,7 +1382,6 @@ class DomainNameAPI_PHPLibrary {
 
         });
 
-        return $response;
     }
 
 
@@ -1093,13 +1389,14 @@ class DomainNameAPI_PHPLibrary {
     private function objectToArray($_obj) {
         try {
             $_obj = json_decode(json_encode($_obj), true);
-        } catch (\Exception $ex) {
+        } catch (Exception $ex) {
         }
         return $_obj;
     }
 
     // Get error if exists
-    private function parseError($response) {
+    private function parseError($response, $trace = true)
+    {
         $result = false;
 
         if (is_null($response)) {
@@ -1164,6 +1461,7 @@ class DomainNameAPI_PHPLibrary {
 
             if (isset($response[key($response)]["OperationMessage"])) {
                 $result["Code"] = "API_" . $response[key($response)]["ErrorCode"];
+                $result['Response'] = print_r($response, true);
             }
 
             if (isset($response[key($response)]["OperationResult"])) {
@@ -1173,7 +1471,10 @@ class DomainNameAPI_PHPLibrary {
             if (isset($response[key($response)]["OperationMessage"])) {
                 $result["Details"] = $response[key($response)]["OperationMessage"];
             }
+        }
 
+        if (isset($result["Code"]) && $trace === true) {
+            $this->sendErrorToSentryAsync(new Exception("API_ERROR: " . $result["Code"] . " - " . $result["Message"] . " - " . $result["Details"]));
         }
 
         return $result;
@@ -1181,7 +1482,7 @@ class DomainNameAPI_PHPLibrary {
 
     // Check if response contains error
     private function hasError($response) {
-        return ($this->parseError($response) === false) ? false : true;
+        return !(($this->parseError($response, false) === false));
     }
 
     // Set error message
@@ -1194,7 +1495,8 @@ class DomainNameAPI_PHPLibrary {
     }
 
     // Parse domain info
-    private function parseDomainInfo($data) {
+  private function parseDomainInfo($data)
+    {
         $result                                     = [];
         $result["ID"]                               = "";
         $result["Status"]                           = "";
@@ -1338,7 +1640,6 @@ class DomainNameAPI_PHPLibrary {
                 case "AdditionalAttributes":
 
                     if (is_array($attrValue)) {
-
                         if (isset($attrValue["KeyValueOfstringstring"])) {
                             foreach ($attrValue["KeyValueOfstringstring"] as $attribute) {
                                 if (isset($attribute["Key"]) && isset($attribute["Value"])) {
@@ -1352,264 +1653,124 @@ class DomainNameAPI_PHPLibrary {
 
                 case "ChildNameServerInfo":
                     if (is_array($attrValue)) {
+                        if (isset($attrValue["ChildNameServerInfo"]) && is_array($attrValue["ChildNameServerInfo"]) && count($attrValue["ChildNameServerInfo"]) > 0) {
+                            foreach ($attrValue["ChildNameServerInfo"] as $attribute) {
+                                if (isset($attribute["ChildNameServer"]) && isset($attribute["IpAddress"])) {
+                                    $ns          = "";
+                                    $IpAddresses = [];
 
-                            if (isset($attrValue["ChildNameServerInfo"]) && is_array($attrValue["ChildNameServerInfo"]) && count($attrValue["ChildNameServerInfo"]) > 0) {
-
-                                foreach ($attrValue["ChildNameServerInfo"] as $attribute) {
-
-                                    if (isset($attribute["ChildNameServer"]) && isset($attribute["IpAddress"])) {
-                                        $ns          = "";
-                                        $IpAddresses = [];
-
-                                        // Name of NameServer
-                                        if (is_string($attribute["ChildNameServer"])) {
-                                            $ns = $attribute["ChildNameServer"];
-                                        }
-
-                                        // IP adresses of NameServer
-                                        if (is_array($attribute["IpAddress"]) && isset($attribute["IpAddress"]["string"])) {
-
-                                            if (is_array($attribute["IpAddress"]["string"])) {
-
-                                                foreach ($attribute["IpAddress"]["string"] as $ip) {
-                                                    if (isset($ip) && is_string($ip)) {
-                                                        $IpAddresses = $ip;
-                                                    }
-                                                }
-
-                                            } elseif (is_string($attribute["IpAddress"]["string"])) {
-                                                $IpAddresses = $attribute["IpAddress"]["string"];
-                                            }
-
-                                        }
-
-                                        $result["ChildNameServers"][] = [
-                                            "ns"  => $ns,
-                                            "ip" => $IpAddresses
-                                        ];
-
-
+                                    // Name of NameServer
+                                    if (is_string($attribute["ChildNameServer"])) {
+                                        $ns = $attribute["ChildNameServer"];
                                     }
 
-                                }
+                                    // IP adresses of NameServer
+                                    if (is_array($attribute["IpAddress"]) && isset($attribute["IpAddress"]["string"])) {
+                                        if (is_array($attribute["IpAddress"]["string"])) {
+                                            foreach ($attribute["IpAddress"]["string"] as $ip) {
+                                                if (isset($ip) && is_string($ip)) {
+                                                    $IpAddresses = $ip;
+                                                }
+                                            }
+                                        } elseif (is_string($attribute["IpAddress"]["string"])) {
+                                            $IpAddresses = $attribute["IpAddress"]["string"];
+                                        }
+                                    }
 
-                            }
-
-
-
-                    }
-                    break;
-
-            }
-
-        }
-
-        return $result;
-    }
-
-    // Parse Contact info
-    private function parseContactInfo($data) {
-        $result                                  = [];
-        $result["ID"]                            = "";
-        $result["Status"]                        = "";
-        $result["Additional"]                    = [];
-        $result["Address"]                       = [];
-        $result["Address"]["Line1"]              = "";
-        $result["Address"]["Line2"]              = "";
-        $result["Address"]["Line3"]              = "";
-        $result["Address"]["State"]              = "";
-        $result["Address"]["City"]               = "";
-        $result["Address"]["Country"]            = "";
-        $result["Address"]["ZipCode"]            = "";
-        $result["Phone"]                         = [];
-        $result["Phone"]["Phone"]                = [];
-        $result["Phone"]["Phone"]["Number"]      = "";
-        $result["Phone"]["Phone"]["CountryCode"] = "";
-        $result["Phone"]["Fax"]["Number"]        = "";
-        $result["Phone"]["Fax"]["CountryCode"]   = "";
-        $result["AuthCode"]                      = "";
-        $result["FirstName"]                     = "";
-        $result["LastName"]                      = "";
-        $result["Company"]                       = "";
-        $result["EMail"]                         = "";
-        $result["Type"]                          = "";
-
-        foreach ($data as $attrName => $attrValue) {
-            switch ($attrName) {
-                case "Id":
-
-                    if (is_numeric($attrValue)) {
-                        $result["ID"] = $attrValue;
-                    }
-                    break;
-
-
-                case "Status":
-
-                    $result["Status"] = $attrValue;
-                    break;
-
-
-                case "AdditionalAttributes":
-
-                    if (is_array($attrValue)) {
-
-                        if (isset($attrValue["KeyValueOfstringstring"])) {
-                            foreach ($attrValue["KeyValueOfstringstring"] as $attribute) {
-                                if (isset($attribute["Key"]) && isset($attribute["Value"])) {
-                                    $result["Additional"][$attribute["Key"]] = $attribute["Value"];
+                                    $result["ChildNameServers"][] = [
+                                        "ns" => $ns,
+                                        "ip" => $IpAddresses
+                                    ];
                                 }
                             }
                         }
                     }
                     break;
-
-
-                case "AddressLine1":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Address"]["Line1"] = $attrValue;
-                    }
-                    break;
-
-
-                case "AddressLine2":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Address"]["Line2"] = $attrValue;
-                    }
-                    break;
-
-
-                case "AddressLine3":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Address"]["Line3"] = $attrValue;
-                    }
-                    break;
-
-
-                case "Auth":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["AuthCode"] = $attrValue;
-                    }
-                    break;
-
-
-                case "City":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Address"]["City"] = $attrValue;
-                    }
-                    break;
-
-
-                case "Company":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Company"] = $attrValue;
-                    }
-                    break;
-
-
-                case "Country":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Address"]["Country"] = $attrValue;
-                    }
-                    break;
-
-
-                case "EMail":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["EMail"] = $attrValue;
-                    }
-                    break;
-
-
-                case "Fax":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Phone"]["Fax"]["Number"] = $attrValue;
-                    }
-                    break;
-
-
-                case "FaxCountryCode":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Phone"]["Fax"]["CountryCode"] = $attrValue;
-                    }
-                    break;
-
-
-                case "Phone":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Phone"]["Phone"]["Number"] = $attrValue;
-                    }
-                    break;
-
-
-                case "PhoneCountryCode":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Phone"]["Phone"]["CountryCode"] = $attrValue;
-                    }
-                    break;
-
-
-                case "FirstName":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["FirstName"] = $attrValue;
-                    }
-                    break;
-
-
-                case "LastName":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["LastName"] = $attrValue;
-                    }
-                    break;
-
-
-                case "State":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Address"]["State"] = $attrValue;
-                    }
-                    break;
-
-
-                case "ZipCode":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Address"]["ZipCode"] = $attrValue;
-                    }
-                    break;
-
-
-                case "Type":
-
-                    if (is_string($attrValue) && !is_null($attrValue)) {
-                        $result["Type"] = $attrValue;
-                    }
-                    break;
-
-
             }
-
         }
 
         return $result;
     }
 
-    private function parseCall($fn,$parameters, $_callback){
 
+    /* Parses contact information from the provided data array.
+ *
+ * @param array $data The data array containing contact information.
+ *
+ * @return array An associative array with the parsed contact information, including:
+ *   - string ID
+ *   - string Status
+ *   - string AuthCode
+ *   - string FirstName
+ *   - string LastName
+ *   - string Company
+ *   - string EMail
+ *   - string Type
+ *   - array Address
+ *     - string Line1
+ *     - string Line2
+ *     - string Line3
+ *     - string State
+ *     - string City
+ *     - string Country
+ *     - string ZipCode
+ *   - array Phone
+ *     - array Phone
+ *       - string Number
+ *       - string CountryCode
+ *     - array Fax
+ *       - string Number
+ *       - string CountryCode
+ *   - array Additional
+ */
+    private function parseContactInfo($data)
+    {
+        $result = [
+            "ID"         => isset($data["Id"]) && is_numeric($data["Id"]) ? $data["Id"] : "",
+            "Status"     => $data["Status"] ?? "",
+            "AuthCode"   => $data["Auth"] ?? "",
+            "FirstName"  => $data["FirstName"] ?? "",
+            "LastName"   => $data["LastName"] ?? "",
+            "Company"    => $data["Company"] ?? "",
+            "EMail"      => $data["EMail"] ?? "",
+            "Type"       => $data["Type"] ?? "",
+            "Address"    => [
+                "Line1"   => $data["AddressLine1"] ?? "",
+                "Line2"   => $data["AddressLine2"] ?? "",
+                "Line3"   => $data["AddressLine3"] ?? "",
+                "State"   => $data["State"] ?? "",
+                "City"    => $data["City"] ?? "",
+                "Country" => $data["Country"] ?? "",
+                "ZipCode" => $data["ZipCode"] ?? "",
+            ],
+            "Phone"      => [
+                "Phone" => [
+                    "Number"      => $data["Phone"] ?? "",
+                    "CountryCode" => $data["PhoneCountryCode"] ?? "",
+                ],
+                "Fax"   => [
+                    "Number"      => $data["Fax"] ?? "",
+                    "CountryCode" => $data["FaxCountryCode"] ?? "",
+                ],
+            ],
+            "Additional" => [],
+        ];
+
+        // AdditionalAttributes kontrolü
+        if (isset($data["AdditionalAttributes"]["KeyValueOfstringstring"]) && is_array($data["AdditionalAttributes"]["KeyValueOfstringstring"])) {
+            foreach ($data["AdditionalAttributes"]["KeyValueOfstringstring"] as $attribute) {
+                if (isset($attribute["Key"]) && isset($attribute["Value"])) {
+                    $result["Additional"][$attribute["Key"]] = $attribute["Value"];
+                }
+            }
+        }
+
+        return $result;
+    }
+
+
+    private function parseCall($fn, $parameters, $_callback)
+    {
         $result=[
             'result'=>'ERROR',
             'error'=>'Unknown Error Occured'
@@ -1620,17 +1781,15 @@ class DomainNameAPI_PHPLibrary {
             // SOAP method which is same as current function name called
             $_response = $this->service->__soapCall($fn, [$parameters]);
 
-            //die(jsson_encode($_response));
+            $this->service->__getLastResponse();
 
-            //file_put_contents('_lastreq.txt',$this->service->__getLastRequest());
-            //print_r($this->service->__getLastRequestHeaders());
-            //print_r($this->service->__getLastResponseHeaders());
 
             // Serialize as array
             $_response = $this->objectToArray($_response);
 
-            self::setRequestData($parameters);
-            self::setResponseData($_response);
+            $this->setLastFunction($fn);
+            $this->setRequestData($parameters);
+            $this->setResponseData($_response);
 
 
             // Check is there any error?
@@ -1639,23 +1798,27 @@ class DomainNameAPI_PHPLibrary {
                 $result = $_callback($_response);
 
             } else {
-                // Hata mesajini dondur
+                // Hata mesajini dondura
                 $result["result"] = "ERROR";
                 $result["error"]  = $this->parseError($_response);
             }
 
-        } catch (\SoapFault $ex) {
+        } catch (SoapFault $ex) {
             $result["result"] = "ERROR";
             $result["error"]  = $this->setError('INVALID_RESPONSE','Invalid Response occured',$ex->getMessage());
-        } catch (\Exception $ex) {
+            $this->sendErrorToSentryAsync($ex);
+        } catch (Exception $ex) {
             $result["result"] = "ERROR";
             $result["error"]  = $this->parseError($this->objectToArray($ex));
+            $this->sendErrorToSentryAsync($ex);
         }
+
+        $this->setParsedResponseData($result);
 
 
         return $result;
-
     }
+
 
 
     /**
