@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.0.22
+ * @version 2.1.1
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
