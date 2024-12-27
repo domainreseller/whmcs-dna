@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.1.1
+ * @version 2.1.2
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
@@ -11,6 +11,17 @@ use \WHMCS\Domains\DomainLookup\SearchResult;
 use \WHMCS\Module\Registrar\Registrarmodule\ApiClient;
 use \WHMCS\Database\Capsule;
 
+if (!defined("WHMCS")) {
+    die("This file cannot be accessed directly");
+}
+
+require_once __DIR__ . '/lib/Services/Language.php';
+new DomainNameApi\Services\Language();
+
+function domainnameapi_version(): string
+{
+    return '2.1.2';
+}
 
 function domainnameapi_getConfigArray($params) {
     $configarray = [];
@@ -1095,6 +1106,80 @@ function domainnameapi_AdminDomainsTabFields($params){
         'AddionalParameters' => $addionals,
     ];
 
+}
+
+function domainnameapi_ClientAreaCustomButtonArray($params)
+{
+    global $_LANG;
+    return [
+        $_LANG['dna']['childhostmanagement'] => "childhosts",
+    ];
+}
+
+function domainnameapi_ClientArea($params)
+{
+}
+
+function domainnameapi_ChildHosts($params)
+{
+    global $_LANG;
+    $dna = getDNAApi($params);
+
+    $process_success = $process_error = false;
+
+    if(isset($_POST['subaction'])) {
+
+        $dom = $params['domainname'];
+        $cns = $_POST['nameserver'].'.'.$params['domainname'];
+
+        if ($_POST['subaction'] == 'addchildhost') {
+            $result = $dna->AddChildNameServer($dom, $cns, $_POST['ipaddress']);
+
+            if ($result["result"] == "OK") {
+                $process_success = true;
+            } else {
+                $process_error = $result["error"]["Message"] . " - " . $result["error"]["Details"];
+            }
+        }
+        if ($_POST['subaction'] == 'deletechildhost') {
+            $result = $dna->DeleteChildNameServer($dom, $cns);
+            if ($result["result"] == "OK") {
+                $process_success = true;
+            } else {
+                $process_error = $result["error"]["Message"] . " - " . $result["error"]["Details"];
+            }
+        }
+        if ($_POST['subaction'] == 'modifychildhost') {
+            $result = $dna->ModifyChildNameServer($dom,$cns, $_POST['newipaddress']);
+            if ($result["result"] == "OK") {
+                $process_success = true;
+            } else {
+                $process_error = $result["error"]["Message"] . " - " . $result["error"]["Details"];
+            }
+        }
+    }
+
+    $result = $dna->GetDetails($params['domainname']);
+
+    $domain      = $result['data']['DomainName'];
+    $nameservers = [];
+    foreach ($result['data']['ChildNameServers'] as $k => $v) {
+        $v['ns'] = str_replace('.'.$params['domainname'],'',$v['ns']);
+        $nameservers[] = ['name' => $v['ns'], 'ip' => $v['ip']];
+    }
+
+    return [
+        'templatefile' => 'childns',
+        'breadcrumb'   => [
+            'clientarea.php?action=domaindetails&id=' . $params['domainid'] . '&modop=custom&a=ChildHosts' => $_LANG['dna']['childhostmanagement']
+        ],
+        'vars'         => [
+            'nameservers'     => $nameservers,
+            'domain'          => $domain,
+            'process_success' => $process_success,
+            'process_error'   => $process_error,
+        ],
+    ];
 }
 
 /**

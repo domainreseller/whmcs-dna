@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.1
+ * @version 2.1.2
  */
 
 
@@ -52,7 +52,7 @@ class DomainNameAPI_PHPLibrary
      * This request does not include sensitive informations, sensitive informations are filtered.
      * @var string $errorReportingDsn
      */
-    private string $errorReportingDsn = 'https://d4e2d61e4af2d4c68fb21ab93bf51ff2@o4507492369039360.ingest.de.sentry.io/4507492373954640';
+    private string $errorReportingDsn = 'https://0ea94fed70c09f95c17dfa211d43ac66@sentry.atakdomain.com/2';
 
     /**
      * Api Username
@@ -2179,40 +2179,39 @@ class DomainNameAPI_PHPLibrary
     {
         $result=[
             'result'=>'ERROR',
-            'error'=>'Unknown Error Occured'
+            'error'  => 'Unknown Error Occurred'
         ];
 
         try {
             $parameters["request"]["UserName"] = $this->serviceUsername;
             $parameters["request"]["Password"] = $this->servicePassword;
-            // SOAP method which is same as current function name called
+            // Call the SOAP method with the same name as the current function
             $_response = $this->service->__soapCall($fn, [$parameters]);
 
+            // Get the last response
             $this->service->__getLastResponse();
 
-
-            // Serialize as array
+            // Convert response to array
             $_response = $this->objectToArray($_response);
 
+            // Set function, request, and response data
             $this->setLastFunction($fn);
             $this->setRequestData($parameters);
             $this->setResponseData($_response);
 
-
-            // Check is there any error?
+            // Check for errors in the response
             if (!$this->hasError($_response)) {
 
                 $result = $_callback($_response);
 
             } else {
-                // Hata mesajini dondura
                 $result["result"] = "ERROR";
                 $result["error"]  = $this->parseError($_response);
             }
 
         } catch (SoapFault $ex) {
             $result["result"] = "ERROR";
-            $result["error"]  = $this->setError('INVALID_RESPONSE','Invalid Response occured',$ex->getMessage());
+            $result["error"]  = $this->setError('INVALID_RESPONSE', 'Invalid response occurred', $ex->getMessage());
             $this->sendErrorToSentryAsync($ex);
         } catch (Exception $ex) {
             $result["result"] = "ERROR";
@@ -2220,6 +2219,7 @@ class DomainNameAPI_PHPLibrary
             $this->sendErrorToSentryAsync($ex);
         }
 
+        // Set parsed response data
         $this->setParsedResponseData($result);
 
 
