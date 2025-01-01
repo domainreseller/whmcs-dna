@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.2
+ * @version 2.1.3
  */
 
 
@@ -26,7 +26,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.1';
+    const VERSION = '2.1.3';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -93,6 +93,15 @@ class DomainNameAPI_PHPLibrary
         self::setCredentials($userName, $password);
         self::useTestMode($testMode);
 
+        $context = stream_context_create(
+            [
+                'ssl' => [
+                    'verify_peer'      => false,
+                    'verify_peer_name' => false
+                ]
+            ]
+        );
+
         try {
         // Create unique connection
             $this->service = new SoapClient($this->serviceUrl . "?singlewsdl", [
@@ -100,6 +109,7 @@ class DomainNameAPI_PHPLibrary
             'features'   => SOAP_SINGLE_ELEMENT_ARRAYS,
             'exceptions' => true,
                 'connection_timeout' => 20,
+                'stream_context'     => $context
         ]);
         } catch (SoapFault $e) {
             $this->sendErrorToSentryAsync($e);
