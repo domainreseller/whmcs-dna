@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.4
+ * @version 2.1.3
  */
 
 
@@ -26,7 +26,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.4';
+    const VERSION = '2.1.3';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -119,6 +119,15 @@ class DomainNameAPI_PHPLibrary
         $this->startAt = microtime(true);
         self::setCredentials($userName, $password);
         self::setApplication($application);
+
+        $context = stream_context_create(
+            [
+                'ssl' => [
+                    'verify_peer'      => false,
+                    'verify_peer_name' => false
+                ]
+            ]
+        );
 
         $context = stream_context_create(
             [

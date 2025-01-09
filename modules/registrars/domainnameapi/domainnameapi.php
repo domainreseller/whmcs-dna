@@ -1347,38 +1347,6 @@ function domainnameapi_parse_cache($key,$ttl,$callback){
 
 }
 
-/*
-function domainnameapi_exchangerates() {
-    $url   = 'https://www.tcmb.gov.tr/kurlar/today.xml';
-    $xml   = simplexml_load_file($url);
-    $rates = [];
-    foreach ($xml->Currency as $k => $v) {
-
-        $name = (string)$v->attributes()->Isim;
-        $code = (string)$v->attributes()->CurrencyCode;
-
-
-        $CrossRateUSD   = (string)$v->CrossRateUSD;
-        $CrossRateOther = (string)$v->CrossRateOther;
-        $forex_selling  = (string)$v->ForexSelling;
-
-        if (!isset($rates[$code])) {
-            if (strlen($CrossRateOther) > 0) {
-                $rates[$code] = $CrossRateOther;
-            } elseif (strlen($CrossRateUSD) > 0) {
-                $rates[$code] = $CrossRateUSD;
-            } else {
-                $rates[$code] = $forex_selling;
-            }
-        }
-    }
-    $rates['TRY'] = $rates['USD'];
-    unset($rates['USD']);
-    unset($rates['XDR']);
-    return $rates;
-}
-*/
-
 function domainnameapi_exchangerates() {
     $rates = [];
 
