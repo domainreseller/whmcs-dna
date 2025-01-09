@@ -1194,7 +1194,7 @@ function getDNAApi($params){
     $password = $params["API_Password"];
     $testmode = $params["API_TestMode"];
 
-    return new \DomainNameApi\DomainNameAPI_PHPLibrary($username,$password,$testmode);
+    return new \DomainNameApi\DomainNameAPI_PHPLibrary($username,$password,$testmode, \DomainNameApi\DomainNameAPI_PHPLibrary::APPLICATION_WHMCS);
 }
 
 function domainnameapi_parse_contact($params) {
