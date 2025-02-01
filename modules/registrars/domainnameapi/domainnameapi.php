@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.1.5
+ * @version 2.2.0
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
@@ -20,7 +20,7 @@ new DomainNameApi\Services\Language();
 
 function domainnameapi_version(): string
 {
-    return '2.1.5';
+    return '2.2.0';
 }
 
 function domainnameapi_getConfigArray($params) {
@@ -1194,7 +1194,7 @@ function getDNAApi($params){
     $password = $params["API_Password"];
     $testmode = $params["API_TestMode"];
 
-    return new \DomainNameApi\DomainNameAPI_PHPLibrary($username,$password, \DomainNameApi\DomainNameAPI_PHPLibrary::APPLICATION_WHMCS);
+    return new \DomainNameApi\DomainNameAPI_PHPLibrary($username,$password);
 }
 
 function domainnameapi_parse_contact($params) {
