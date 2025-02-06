@@ -10,9 +10,8 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.5
+ * @version 2.1.6
  */
-
 
 
 namespace DomainNameApi;
@@ -26,46 +25,76 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.5';
+    const VERSION = '2.1.6';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
         'ns2.domainnameapi.com',
     ];
 
-    const DEFAULT_IGNORED_ERRORS=[
-            'Domain not found',
-            'ERR_DOMAIN_NOT_FOUND',
-            'Reseller not found',
-            'Domain is not in updateable status. It must be active',
-            'balance is not sufficient',
-            'Price definition not found',
-        ];
+    const DEFAULT_IGNORED_ERRORS = [
+        '*Domain not found*',
+        '*ERR_DOMAIN_NOT_FOUND*',
+        '*Reseller not found*',
+        '*Domain is not in updateable status. It must be active*',
+        '*balance is not sufficient*',
+        '*Price definition not found*',
+    ];
 
     const DEFAULT_CACHE_TTL = 512;
-    const DEFAULT_TIMEOUT = 20;
-    const DEFAULT_REASON = 'Owner request';
+    const DEFAULT_TIMEOUT   = 20;
+    const DEFAULT_REASON    = 'Owner request';
 
-    const APPLICATION_WHMCS = 'WHMCS';
-    const APPLICATION_WISECP = 'WISECP';
-    const APPLICATION_HOSTBILL = 'HOSTBILL';
-    const APPLICATION_BLESTA = 'BLESTA';
-    const APPLICATION_ISPBILLMANAGER = 'ISPBILLMANAGER';
-    const APPLICATION_CLIENTEXEC = 'CLIENTEXEC';
-    const APPLICATION_HOSTFACT = 'HOSTFACT';
-    const APPLICATION_CORE = 'CORE';
-    const APPLICATION_NONE = 'NONE';
+    private const APPLICATIONS = [
+        'WHMCS'          => [
+            'path' => '/modules/registrars/domainnameapi/',
+            'dsn'  => 'https://cbaee35fa4d2836942641e10c2109cb6@sentry.atakdomain.com/9'
+        ],
+        'WISECP'         => [
+            'path' => '/coremio/modules/Registrars/DomainNameAPI/',
+            'dsn'  => 'https://16578e3378f7d6c329ff95d9573bc6fa@sentry.atakdomain.com/8'
+        ],
+        'HOSTBILL'       => [
+            'path' => '/includes/modules/Domain/domainnameapi/',
+            'dsn'  => 'https://be47804b215cb479dbfc44db5c662549@sentry.atakdomain.com/11'
+        ],
+        'BLESTA'         => [
+            'path' => '/components/modules/domainnameapi/',
+            'dsn'  => 'https://8f8ed6f84abaa93ff49b56f15d3c1f38@sentry.atakdomain.com/10'
+        ],
+        'CLIENTEXEC'     => [
+            'path' => '/plugins/registrars/domainnameapi/',
+            'dsn'  => 'https://033791219211d863fdb9c08b328ba058@sentry.atakdomain.com/13'
+        ],
+        'CORE'           => [
+            'path' => '',
+            'dsn'  => 'https://0ea94fed70c09f95c17dfa211d43ac66@sentry.atakdomain.com/2'
+        ],
+        'ISPBILLMANAGER' => [
+            'path' => '',
+            'dsn'  => ''
+        ],
+        'HOSTFACT'       => [
+            'path' => '',
+            'dsn'  => ''
+        ],
+        'NONE'           => [
+            'path' => '',
+            'dsn'  => ''
+        ]
+    ];
 
-    const APPLICATIONS=[
-      self::APPLICATION_WHMCS,
-      self::APPLICATION_WISECP,
-      self::APPLICATION_HOSTBILL,
-      self::APPLICATION_BLESTA,
-      self::APPLICATION_ISPBILLMANAGER,
-      self::APPLICATION_CLIENTEXEC,
-      self::APPLICATION_HOSTFACT,
-      self::APPLICATION_CORE,
-      self::APPLICATION_NONE,
+    private const CURRENCIES = [
+        'TRY' => [
+            'id'   => 1,
+            'code' => 'TRY',
+            'name' => 'Turkish Lira'
+        ],
+        'USD' => [
+            'id'   => 2,
+            'code' => 'USD',
+            'name' => 'US Dollar'
+        ]
     ];
 
     /**
@@ -77,7 +106,7 @@ class DomainNameAPI_PHPLibrary
      * This request does not include sensitive informations, sensitive informations are filtered.
      * @var string $errorReportingDsn
      */
-    private string $errorReportingDsn = 'https://0ea94fed70c09f95c17dfa211d43ac66@sentry.atakdomain.com/2';
+    private string $errorReportingDsn  = 'https://0ea94fed70c09f95c17dfa211d43ac66@sentry.atakdomain.com/2';
     private string $errorReportingPath = '';
 
     /**
@@ -97,12 +126,13 @@ class DomainNameAPI_PHPLibrary
      * Api Service Soap URL
      * @var string $serviceUrl
      */
-    private string $serviceUrl         = "https://whmcs.domainnameapi.com/DomainApi.svc";
-    private string $application         = "CORE";
-    public  array $lastRequest        = [];
-    public  array $lastResponse       = [];
-    public  array $lastParsedResponse = [];
-    public string $lastFunction       = '';
+    private string     $serviceUrl         = "https://whmcs.domainnameapi.com/DomainApi.svc";
+    private string     $application        = "CORE";
+    public array       $lastRequest        = [];
+    public array       $lastResponse       = [];
+    public ?string       $lastResponseHeaders  = '';
+    public array       $lastParsedResponse = [];
+    public string      $lastFunction       = '';
     private SoapClient $service;
     private            $startAt;
 
@@ -114,20 +144,18 @@ class DomainNameAPI_PHPLibrary
      * @param bool $testMode
      * @throws Exception | SoapFault
      */
-    public function __construct($userName = "ownername", $password = "ownerpass", $application='CORE')
+    public function __construct($userName = "ownername", $password = "ownerpass")
     {
         $this->startAt = microtime(true);
         self::setCredentials($userName, $password);
-        self::setApplication($application);
+        self::setApplication();
 
-        $context = stream_context_create(
-            [
+        $context = stream_context_create([
                 'ssl' => [
                     'verify_peer'      => false,
                     'verify_peer_name' => false
                 ]
-            ]
-        );
+            ]);
 
         try {
             // Create unique connection
@@ -147,54 +175,28 @@ class DomainNameAPI_PHPLibrary
         }
     }
 
-    private function setApplication($application)
+    private function setApplication()
     {
-        $this->application = $application;
+        $dir                      = __DIR__;
+        $this->application        = 'CORE';
+        $this->errorReportingPath = '';
+        $this->errorReportingDsn  = self::APPLICATIONS['CORE']['dsn'];
 
-        if(!in_array( $this->application,self::APPLICATIONS)){
-             $this->application = 'CORE';
-        }
-        switch ( $this->application) {
-            case self::APPLICATION_WHMCS:
-                $this->errorReportingDsn = "https://cbaee35fa4d2836942641e10c2109cb6@sentry.atakdomain.com/9";
-                $this->errorReportingPath='/modules/registrars/domainnameapi/';
+        foreach (self::APPLICATIONS as $app => $config) {
+            if ($config['path'] && strpos($dir, $config['path']) !== false) {
+                $this->application        = $app;
+                $this->errorReportingPath = $config['path'];
+                $this->errorReportingDsn  = $config['dsn'];
                 break;
-
-            case self::APPLICATION_WISECP:
-                $this->errorReportingDsn = "https://16578e3378f7d6c329ff95d9573bc6fa@sentry.atakdomain.com/8";
-                $this->errorReportingPath='/coremio/modules/Registrars/DomainNameAPI/';
-                break;
-
-            case self::APPLICATION_HOSTBILL:
-                $this->errorReportingDsn = "https://be47804b215cb479dbfc44db5c662549@sentry.atakdomain.com/11";
-                $this->errorReportingPath='/includes/modules/Domain/domainnameapi/';
-                break;
-
-            case self::APPLICATION_BLESTA:
-                $this->errorReportingDsn = "https://8f8ed6f84abaa93ff49b56f15d3c1f38@sentry.atakdomain.com/10";
-                $this->errorReportingPath='/components/modules/domainnameapi/';
-                break;
-
-            case self::APPLICATION_CORE:
-                $this->errorReportingDsn = "https://0ea94fed70c09f95c17dfa211d43ac66@sentry.atakdomain.com/2";
-                break;
-
-            case self::APPLICATION_ISPBILLMANAGER:
-                $this->errorReportingDsn = "https://dace28deb069996acecf619c9e397b15@sentry.atakdomain.com/12";
-                break;
-
-            case self::APPLICATION_CLIENTEXEC:
-                $this->errorReportingDsn = "https://033791219211d863fdb9c08b328ba058@sentry.atakdomain.com/13";
-                break;
-
-            case self::APPLICATION_HOSTFACT:
-                $this->errorReportingDsn = "https://58fe0a01a6704d9f1c2dbbc1a316f233@sentry.atakdomain.com/14";
-                break;
-            case self::APPLICATION_NONE:
-                $this->errorReportingEnabled = false;
-                break;
+            }
         }
 
+        // Geçerli bir uygulama değilse CORE'a geri dön
+        if (!array_key_exists($this->application, self::APPLICATIONS)) {
+            $this->application        = 'CORE';
+            $this->errorReportingPath = self::APPLICATIONS['CORE']['path'];
+            $this->errorReportingDsn  = self::APPLICATIONS['CORE']['dsn'];
+        }
     }
 
     /**
@@ -224,8 +226,9 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
-     * This method returns the last request sent to the API
-     * @return array|mixed
+     * Get last request sent to API
+     *
+     * @return array Request data
      */
     public function getRequestData()
     {
@@ -233,7 +236,9 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * This method sets the last request sent to the API
+     * Set last request sent to API
+     *
+     * @param array $request Request data to set
      * @return DomainNameAPI_PHPLibrary
      */
     public function setRequestData($request)
@@ -243,8 +248,9 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * This method returns the last response from the API
-     * @return array|mixed
+     * Get last response from API
+     *
+     * @return array Response data
      */
     public function getResponseData()
     {
@@ -252,8 +258,10 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * This method sets the last response from the API
-     * @return array|mixed
+     * Set last response from API
+     *
+     * @param array $response Response data to set
+     * @return DomainNameAPI_PHPLibrary
      */
     public function setResponseData($response)
     {
@@ -262,8 +270,31 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * This method returns the last parsed response from the API
-     * @return array|mixed
+     * Get last response headers from API
+     *
+     * @return ?string Response headers
+     */
+    public function getResponseHeaders()
+    {
+        return $this->lastResponseHeaders;
+    }
+
+    /**
+     * Set last response headers from API
+     *
+     * @param ?string $headers Response headers to set
+     * @return DomainNameAPI_PHPLibrary
+     */
+    public function setResponseHeaders($headers)
+    {
+        $this->lastResponseHeaders = $headers;
+        return $this;
+    }
+
+    /**
+     * Get last parsed response from API
+     *
+     * @return array Parsed response data
      */
     public function getParsedResponseData()
     {
@@ -271,8 +302,10 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * This method sets the last parsed response from the API
-     * @return array|mixed
+     * Set last parsed response from API
+     *
+     * @param array $response Parsed response data to set
+     * @return DomainNameAPI_PHPLibrary
      */
     public function setParsedResponseData($response)
     {
@@ -281,8 +314,9 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * This method returns the last function called
-     * @return string
+     * Get last function called
+     *
+     * @return string Function name
      */
     public function getLastFunction()
     {
@@ -290,7 +324,9 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * This method sets the last function called
+     * Set last function called
+     *
+     * @param string $function Function name to set
      * @return DomainNameAPI_PHPLibrary
      */
     public function setLastFunction($function)
@@ -299,28 +335,38 @@ class DomainNameAPI_PHPLibrary
         return $this;
     }
 
+    /**
+     * Get API service URL
+     *
+     * @return string Service URL
+     */
     public function getServiceUrl()
     {
         return $this->serviceUrl;
     }
 
+    /**
+     * Set API service URL
+     *
+     * @param string $url New service URL
+     */
     public function setServiceUrl($url)
     {
         $this->serviceUrl = $url;
     }
 
 
-
-
-
     /**
      * Get Current account details with balance
+     *
+     * @return array Account details and balance information
+     * @see examples/GetResellerDetails.php
      */
     public function GetResellerDetails()
     {
         $parameters = [
             "request" => [
-                'CurrencyId' => 2 // 1: TRY, 2: USD
+                'CurrencyId' => self::CURRENCIES['USD']['id'] // Varsayılan USD
             ]
         ];
 
@@ -337,7 +383,7 @@ class DomainNameAPI_PHPLibrary
 
                 $active_currency = $data['ResellerInfo']['BalanceInfoList']['BalanceInfo'][0];
                 $balances        = [];
-                foreach ($data['ResellerInfo']['BalanceInfoList']['BalanceInfo'] as  $v) {
+                foreach ($data['ResellerInfo']['BalanceInfoList']['BalanceInfo'] as $v) {
                     if ($v['CurrencyName'] == $data['ResellerInfo']['CurrencyInfo']['Code']) {
                         $active_currency = $v;
                     }
@@ -355,7 +401,8 @@ class DomainNameAPI_PHPLibrary
                 $resp['balances'] = $balances;
             } else {
                 $resp['result'] = 'ERROR';
-                $resp['error']  = $this->setError("INVALID_CREDINENTIALS", "Invalid response received from server!", "invalid username and password");
+                $resp['error']  = $this->setError("INVALID_CREDINENTIALS", "Invalid response received from server!",
+                    "invalid username and password");
             }
 
 
@@ -368,21 +415,32 @@ class DomainNameAPI_PHPLibrary
 
     /**
      * Get Current primary Balance for your account
+     *
+     * @param string $currencyId Currency code (USD, TRY etc.)
+     * @return array Balance information for specified currency
+     * @see examples/GetCurrentBalance.php
      */
-    public function GetCurrentBalance($currencyId = 2)
+    public function GetCurrentBalance($currencyId = 'USD')
     {
-        if (strtoupper($currencyId) == 'USD') {
-            $currencyId = 2;
-        } elseif (in_array(strtoupper($currencyId), ['TRY', 'TL', '1'])) {
-            $currencyId = 1;
-        } else {
-            $currencyId = 2;
-        }
+        $currencyId = strtoupper($currencyId);
 
+        // Para birimi ID'sini bul
+        $currency = self::CURRENCIES['USD']; // Varsayılan USD
+        if (isset(self::CURRENCIES[$currencyId])) {
+            $currency = self::CURRENCIES[$currencyId];
+        } elseif ($currencyId === '1' || $currencyId === '2') {
+            // Eski ID tabanlı kullanım için geriye dönük uyumluluk
+            foreach (self::CURRENCIES as $curr) {
+                if ($curr['id'] == $currencyId) {
+                    $currency = $curr;
+                    break;
+                }
+            }
+        }
 
         $parameters = [
             "request" => [
-                'CurrencyId' => $currencyId
+                'CurrencyId' => $currency['id']
             ]
         ];
 
@@ -397,24 +455,14 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
-     * Checks the availability of specified domain names with given extensions
-     * 
-     * @param array  $domains     Array of domain names to check (e.g., ['example', 'test'])
-     * @param array  $extensions  Array of extensions to check (e.g., ['.com', '.net'])
-     * @param int    $period      Registration period in years
-     * @param string $Command     Operation type ('create', 'renew', 'transfer', etc.)
-     * 
-     * @return array {
-     *     @type string "TLD"         Top-level domain extension
-     *     @type string "DomainName"  Full domain name
-     *     @type string "Status"      Availability status ('available', 'unavailable', etc.)
-     *     @type string "Command"     Operation performed
-     *     @type int    "Period"      Registration period
-     *     @type bool   "IsFee"       Whether premium fees apply
-     *     @type float  "Price"       Price amount
-     *     @type string "Currency"    Currency code
-     *     @type string "Reason"      Status description or reason
-     * }
+     * Checks availability of domain names with given extensions
+     *
+     * @param array $domains Domain names to check
+     * @param array $extensions Extensions to check
+     * @param int $period Registration period in years
+     * @param string $Command Operation type (create, renew, transfer etc.)
+     * @return array Domain availability status and pricing information
+     * @see examples/CheckAvailability.php
      */
     public function CheckAvailability($domains, $extensions, $period, $Command)
     {
@@ -469,42 +517,16 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * Hesabınızdaki alan adlarının listesini getirir
-     * 
-     * @param array $extra_parameters İsteğe bağlı ek parametreler {
-     *     @type int    "PageNumber"     Sayfa numarası (varsayılan: 1)
-     *     @type int    "PageSize"       Sayfa başına sonuç sayısı (varsayılan: 100)
-     *     @type string "SearchText"     Arama metni
-     *     @type string "StatusFilter"   Durum filtresi ('Active', 'Expired', vb.)
-     *     @type string "SortField"      Sıralama alanı ('DomainName', 'ExpirationDate', vb.)
-     *     @type string "SortOrder"      Sıralama yönü ('ASC', 'DESC')
-     * }
-     * 
-     * @return array {
-     *     @type string "result"      İşlem sonucu ('OK' veya 'ERROR')
-     *     @type int    "TotalCount"  Toplam alan adı sayısı
-     *     @type array  "data" {
-     *         @type array "Domains" Alan adı bilgileri dizisi [
-     *             @type int    "ID"                  Alan adı ID'si
-     *             @type string "Status"              Durum
-     *             @type string "DomainName"          Alan adı
-     *             @type string "AuthCode"            Transfer kodu
-     *             @type bool   "LockStatus"          Kilit durumu
-     *             @type bool   "PrivacyProtection"   Gizlilik koruma durumu
-     *             @type string "StartDate"           Başlangıç tarihi
-     *             @type string "ExpirationDate"      Bitiş tarihi
-     *             @type int    "RemainingDays"       Kalan gün sayısı
-     *             @type array  "NameServers"         Alan adı sunucuları
-     *         ]
-     *     }
-     *     @type array  "error"       Hata durumunda hata detayları
-     * }
+     * Get list of domains in your account
+     *
+     * @param array $extra_parameters Optional parameters for filtering and pagination
+     * @return array List of domains with their details
+     * @see examples/GetList.php
      */
     public function GetList($extra_parameters = [])
     {
         $parameters = [
-            "request" => [
-            ]
+            "request" => []
         ];
 
         foreach ($extra_parameters as $k => $v) {
@@ -548,33 +570,11 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * Retrieves TLD list and pricing matrix required for price and TLD synchronization
-     * 
-     * @param int $count Number of results to return per page (default: 20)
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data"    Array of TLD information [
-     *         @type int    "id"         TLD ID
-     *         @type string "status"     TLD status ('Active', 'Inactive', etc.)
-     *         @type int    "maxchar"    Maximum character limit
-     *         @type int    "maxperiod"  Maximum registration period in years
-     *         @type int    "minchar"    Minimum character limit
-     *         @type int    "minperiod"  Minimum registration period in years
-     *         @type string "tld"        Top-level domain extension
-     *         @type array  "pricing" {
-     *             @type array "create"  Registration prices by period
-     *             @type array "renew"   Renewal prices by period
-     *             @type array "transfer" Transfer prices by period
-     *         }
-     *         @type array  "currencies" {
-     *             @type string "create"   Currency for registration
-     *             @type string "renew"    Currency for renewal
-     *             @type string "transfer" Currency for transfer
-     *         }
-     *     ]
-     *     @type array  "error"   Error details if operation fails
-     * }
+     * Get TLD list and pricing matrix
+     *
+     * @param int $count Number of results per page
+     * @return array List of TLDs with pricing information
+     * @see examples/GetTldList.php
      */
     public function GetTldList($count = 20)
     {
@@ -638,37 +638,11 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * Retrieves detailed information for a specific domain
-     * 
-     * @param string $domainName The domain name to query
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "ID"                 Domain ID
-     *         @type string "Status"             Domain status
-     *         @type string "DomainName"         Full domain name
-     *         @type string "AuthCode"           Transfer authorization code
-     *         @type bool   "LockStatus"         Domain lock status
-     *         @type bool   "PrivacyProtectionStatus" Privacy protection status
-     *         @type bool   "IsChildNameServer"  Child nameserver status
-     *         @type array  "Contacts" {
-     *             @type array "Billing"         Billing contact details
-     *             @type array "Technical"       Technical contact details
-     *             @type array "Administrative"  Administrative contact details
-     *             @type array "Registrant"      Registrant contact details
-     *         }
-     *         @type array  "Dates" {
-     *             @type string "Start"          Registration date
-     *             @type string "Expiration"     Expiration date
-     *             @type int    "RemainingDays"  Days until expiration
-     *         }
-     *         @type array  "NameServers"        List of nameservers
-     *         @type array  "Additional"         Additional domain attributes
-     *         @type array  "ChildNameServers"   Child nameserver information
-     *     }
-     *     @type array  "error"   Error details if operation fails
-     * }
+     * Get detailed information for a domain
+     *
+     * @param string $domainName Domain name to query
+     * @return array Detailed domain information
+     * @see examples/GetDetails.php
      */
     public function GetDetails($domainName)
     {
@@ -681,6 +655,9 @@ class DomainNameAPI_PHPLibrary
 
         $response = self::parseCall(__FUNCTION__, $parameters, function ($response) {
             $data = $response[key($response)];
+
+            $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_LIST: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
+
 
             // If DomainInfo a valid array
             if (isset($data["DomainInfo"]) && is_array($data["DomainInfo"])) {
@@ -703,24 +680,12 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * Modifies nameservers for a specified domain
-     * 
-     * @param string $domainName  The domain name to modify nameservers for
-     * @param array  $nameServers Array of nameserver addresses (e.g., ['ns1.example.com', 'ns2.example.com'])
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type array "NameServers" List of updated nameservers
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When nameservers array is invalid or empty
+     * Modify nameservers for a domain
+     *
+     * @param string $domainName Domain name to modify
+     * @param array $nameServers New nameserver addresses
+     * @return array Operation result
+     * @see examples/ModifyNameServer.php
      */
     public function ModifyNameServer($domainName, $nameServers)
     {
@@ -748,23 +713,11 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
-     * Enable Theft Protection Lock (Registry Lock) for a domain
-     * 
-     * @param string $domainName The domain name to enable theft protection for
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type bool "LockStatus" New lock status (true when enabled)
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When domain name is invalid or operation fails
+     * Enable Theft Protection Lock for a domain
+     *
+     * @param string $domainName Domain name to enable protection for
+     * @return array Operation result
+     * @see examples/EnableTheftProtectionLock.php
      */
     public function EnableTheftProtectionLock($domainName)
     {
@@ -789,23 +742,11 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
-     * Disable Theft Protection Lock (Registry Lock) for a domain
-     * 
-     * @param string $domainName The domain name to disable theft protection for
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type bool "LockStatus" New lock status (false when disabled)
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When domain name is invalid or operation fails
+     * Disable Theft Protection Lock for a domain
+     *
+     * @param string $domainName Domain name to disable protection for
+     * @return array Operation result
+     * @see examples/DisableTheftProtectionLock.php
      */
     public function DisableTheftProtectionLock($domainName)
     {
@@ -831,26 +772,13 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
-     * Adds a child nameserver for a domain
-     * 
-     * @param string $domainName The domain name to add child nameserver for
-     * @param string $nameServer The hostname of the child nameserver (e.g., 'ns1.mydomain.com')
-     * @param string $ipAddress  The IP address for the child nameserver
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "NameServer" The hostname of the added child nameserver
-     *         @type array  "IPAdresses" Array of IP addresses assigned to the nameserver
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When parameters are invalid or operation fails
+     * Add child nameserver for a domain
+     *
+     * @param string $domainName Domain name to add child nameserver for
+     * @param string $nameServer Hostname of child nameserver
+     * @param string $ipAddress IP address for child nameserver
+     * @return array Operation result
+     * @see examples/AddChildNameServer.php
      */
     public function AddChildNameServer($domainName, $nameServer, $ipAddress)
     {
@@ -878,24 +806,12 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
-     * Deletes a child nameserver from a domain
-     * 
-     * @param string $domainName The domain name to remove child nameserver from
-     * @param string $nameServer The hostname of the child nameserver to delete (e.g., 'ns1.mydomain.com')
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "NameServer" The hostname of the deleted child nameserver
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When parameters are invalid or nameserver doesn't exist
+     * Delete child nameserver from a domain
+     *
+     * @param string $domainName Domain name to remove child nameserver from
+     * @param string $nameServer Hostname of child nameserver to delete
+     * @return array Operation result
+     * @see examples/DeleteChildNameServer.php
      */
     public function DeleteChildNameServer($domainName, $nameServer)
     {
@@ -920,27 +836,14 @@ class DomainNameAPI_PHPLibrary
     }
 
 
-        /**
-     * Modifies IP address of a child nameserver for a domain
-     * 
-     * @param string $domainName The domain name that owns the child nameserver
-     * @param string $nameServer The hostname of the child nameserver to modify (e.g., 'ns1.mydomain.com')
-     * @param string $ipAddress  The new IP address to assign to the child nameserver
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "NameServer" The hostname of the modified child nameserver
-     *         @type array  "IPAdresses" Array of updated IP addresses for the nameserver
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When parameters are invalid or nameserver doesn't exist
+    /**
+     * Modify IP address of child nameserver
+     *
+     * @param string $domainName Domain name that owns the child nameserver
+     * @param string $nameServer Hostname of child nameserver to modify
+     * @param string $ipAddress New IP address for child nameserver
+     * @return array Operation result
+     * @see examples/ModifyChildNameServer.php
      */
     public function ModifyChildNameServer($domainName, $nameServer, $ipAddress)
     {
@@ -969,55 +872,12 @@ class DomainNameAPI_PHPLibrary
 
     // CONTACT MANAGEMENT
 
-        /**
-     * Retrieves all contact information for a domain (Administrative, Billing, Technical, Registrant)
-     * 
-     * @param string $domainName The domain name to get contacts for
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type array "contacts" {
-     *             @type array "Administrative" {
-     *                 @type string "ID"        Contact ID
-     *                 @type string "Status"    Contact status
-     *                 @type string "FirstName" First name
-     *                 @type string "LastName"  Last name
-     *                 @type string "Company"   Company name
-     *                 @type string "EMail"     Email address
-     *                 @type array  "Address" {
-     *                     @type string "Line1"    Address line 1
-     *                     @type string "Line2"    Address line 2
-     *                     @type string "Line3"    Address line 3
-     *                     @type string "State"    State/Province
-     *                     @type string "City"     City
-     *                     @type string "Country"  Country code
-     *                     @type string "ZipCode"  Postal/ZIP code
-     *                 }
-     *                 @type array "Phone" {
-     *                     @type array "Phone" {
-     *                         @type string "Number"      Phone number
-     *                         @type string "CountryCode" Country calling code
-     *                     }
-     *                     @type array "Fax" {
-     *                         @type string "Number"      Fax number
-     *                         @type string "CountryCode" Country calling code
-     *                     }
-     *                 }
-     *             }
-     *             @type array "Billing"        Similar structure as Administrative
-     *             @type array "Technical"      Similar structure as Administrative
-     *             @type array "Registrant"     Similar structure as Administrative
-     *         }
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When domain name is invalid or contacts cannot be retrieved
+    /**
+     * Get contact information for a domain
+     *
+     * @param string $domainName Domain name to get contacts for
+     * @return array Contact information for all contact types
+     * @see examples/GetContacts.php
      */
     public function GetContacts($domainName)
     {
@@ -1065,51 +925,12 @@ class DomainNameAPI_PHPLibrary
     }
 
 
-       /**
+    /**
      * Saves or updates contact information for all contact types of a domain
-     * 
+     *
      * @param string $domainName The domain name to update contacts for
-     * @param array  $contacts   Array containing all contact information {
-     *     @type array "Administrative" {
-     *         @type string "FirstName" First name
-     *         @type string "LastName"  Last name
-     *         @type string "Company"   Company name
-     *         @type string "EMail"     Email address
-     *         @type array  "Address" {
-     *             @type string "Line1"    Address line 1
-     *             @type string "Line2"    Address line 2
-     *             @type string "Line3"    Address line 3
-     *             @type string "State"    State/Province
-     *             @type string "City"     City
-     *             @type string "Country"  Country code
-     *             @type string "ZipCode"  Postal/ZIP code
-     *         }
-     *         @type array "Phone" {
-     *             @type array "Phone" {
-     *                 @type string "Number"      Phone number
-     *                 @type string "CountryCode" Country calling code
-     *             }
-     *             @type array "Fax" {
-     *                 @type string "Number"      Fax number
-     *                 @type string "CountryCode" Country calling code
-     *             }
-     *         }
-     *     }
-     *     @type array "Billing"        Similar structure as Administrative
-     *     @type array "Technical"      Similar structure as Administrative
-     *     @type array "Registrant"     Similar structure as Administrative
-     * }
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When parameters are invalid or contact update fails
+     * @param array $contacts
+     * @return array
      */
     public function SaveContacts($domainName, $contacts)
     {
@@ -1150,39 +971,14 @@ class DomainNameAPI_PHPLibrary
         return $response;
     }
 
-    // DOMAIN TRANSFER (INCOMING DOMAIN)
-
-    // Start domain transfer (Incoming domain)
     /**
-     * Initiates a domain transfer to your account
-     * 
-     * @param string $domainName The domain name to transfer
-     * @param string $eppCode    Authorization/EPP code from current registrar
-     * @param int    $period     Transfer period in years
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "ID"                 Domain ID
-     *         @type string "Status"             Transfer status
-     *         @type string "DomainName"         Full domain name
-     *         @type string "AuthCode"           Transfer authorization code
-     *         @type bool   "LockStatus"         Domain lock status
-     *         @type bool   "PrivacyProtectionStatus" Privacy protection status
-     *         @type array  "Dates" {
-     *             @type string "Start"          Transfer initiation date
-     *             @type string "Expiration"     New expiration date after transfer
-     *         }
-     *         @type array  "NameServers"        Current nameservers
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When parameters are invalid, EPP code is incorrect, or domain is not eligible for transfer
+     * Start domain transfer to your account
+     *
+     * @param string $domainName Domain name to transfer
+     * @param string $eppCode Authorization code from current registrar
+     * @param int $period Transfer period in years
+     * @return array Transfer status and domain information
+     * @see examples/Transfer.php
      */
     public function Transfer($domainName, $eppCode, $period)
     {
@@ -1230,24 +1026,12 @@ class DomainNameAPI_PHPLibrary
     }
 
 
-        /**
-     * Cancels a pending incoming transfer request for a domain
-     * 
-     * @param string $domainName The domain name to cancel transfer for
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "DomainName" The domain name for which transfer was cancelled
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When domain name is invalid or transfer cannot be cancelled
+    /**
+     * Cancel pending incoming transfer
+     *
+     * @param string $domainName Domain name to cancel transfer for
+     * @return array Operation result
+     * @see examples/CancelTransfer.php
      */
     public function CancelTransfer($domainName)
     {
@@ -1273,24 +1057,12 @@ class DomainNameAPI_PHPLibrary
     }
 
 
-        /**
-     * Approves a pending outgoing transfer request for a domain
-     * 
-     * @param string $domainName The domain name to approve transfer for
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "DomainName" The domain name for which transfer was approved
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When domain name is invalid, transfer is not pending, or approval fails
+    /**
+     * Approve pending outgoing transfer
+     *
+     * @param string $domainName Domain name to approve transfer for
+     * @return array Operation result
+     * @see examples/ApproveTransfer.php
      */
     public function ApproveTransfer($domainName)
     {
@@ -1315,24 +1087,12 @@ class DomainNameAPI_PHPLibrary
         return $response;
     }
 
-        /**
-     * Rejects a pending outgoing transfer request for a domain
-     * 
-     * @param string $domainName The domain name to reject transfer for
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "DomainName" The domain name for which transfer was rejected
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When domain name is invalid, transfer is not pending, or rejection fails
+    /**
+     * Reject pending outgoing transfer
+     *
+     * @param string $domainName Domain name to reject transfer for
+     * @return array Operation result
+     * @see examples/RejectTransfer.php
      */
     public function RejectTransfer($domainName)
     {
@@ -1358,25 +1118,13 @@ class DomainNameAPI_PHPLibrary
     }
 
 
-        /**
-     * Renews a domain registration for specified period
-     * 
-     * @param string $domainName The domain name to renew
-     * @param int    $period     Renewal period in years
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "ExpirationDate" New expiration date after renewal
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When domain name is invalid, period is invalid, or renewal fails
+    /**
+     * Renew domain registration
+     *
+     * @param string $domainName Domain name to renew
+     * @param int $period Renewal period in years
+     * @return array Renewal status and expiration date
+     * @see examples/Renew.php
      */
     public function Renew($domainName, $period)
     {
@@ -1411,69 +1159,18 @@ class DomainNameAPI_PHPLibrary
     }
 
 
-        /**
-     * Registers a new domain with complete contact information
-     * 
-     * @param string $domainName The domain name to register
-     * @param int    $period     Registration period in years
-     * @param array  $contacts   Array containing all contact information {
-     *     @type array "Administrative" {
-     *         @type string "FirstName" First name
-     *         @type string "LastName"  Last name
-     *         @type string "Company"   Company name
-     *         @type string "EMail"     Email address
-     *         @type array  "Address" {
-     *             @type string "Line1"    Address line 1
-     *             @type string "Line2"    Address line 2
-     *             @type string "Line3"    Address line 3
-     *             @type string "State"    State/Province
-     *             @type string "City"     City
-     *             @type string "Country"  Country code
-     *             @type string "ZipCode"  Postal/ZIP code
-     *         }
-     *         @type array "Phone" {
-     *             @type array "Phone" {
-     *                 @type string "Number"      Phone number
-     *                 @type string "CountryCode" Country calling code
-     *             }
-     *             @type array "Fax" {
-     *                 @type string "Number"      Fax number
-     *                 @type string "CountryCode" Country calling code
-     *             }
-     *         }
-     *     }
-     *     @type array "Billing"        Similar structure as Administrative
-     *     @type array "Technical"      Similar structure as Administrative
-     *     @type array "Registrant"     Similar structure as Administrative
-     * }
-     * @param array $nameServers       Array of nameservers (default: ["dns.domainnameapi.com", "web.domainnameapi.com"])
-     * @param bool   $eppLock           Whether to enable EPP lock (default: true)
-     * @param bool   $privacyLock       Whether to enable privacy protection (default: false)
-     * @param array  $addionalAttributes Optional additional attributes for specific TLDs
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "ID"                 Domain ID
-     *         @type string "Status"             Registration status
-     *         @type string "DomainName"         Full domain name
-     *         @type string "AuthCode"           Transfer authorization code
-     *         @type bool   "LockStatus"         Domain lock status
-     *         @type bool   "PrivacyProtectionStatus" Privacy protection status
-     *         @type array  "NameServers"        Assigned nameservers
-     *         @type array  "Dates" {
-     *             @type string "Start"          Registration date
-     *             @type string "Expiration"     Expiration date
-     *         }
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When parameters are invalid or registration fails
+    /**
+     * Register new domain with contact information
+     *
+     * @param string $domainName Domain name to register
+     * @param int $period Registration period in years
+     * @param array $contacts Contact information for all types
+     * @param array $nameServers Nameserver addresses
+     * @param bool $eppLock Enable EPP lock
+     * @param bool $privacyLock Enable privacy protection
+     * @param array $addionalAttributes Additional TLD-specific attributes
+     * @return array Registration status and domain information
+     * @see examples/RegisterWithContactInfo.php
      */
     public function RegisterWithContactInfo(
         $domainName,
@@ -1503,10 +1200,10 @@ class DomainNameAPI_PHPLibrary
                 "NameServerList"          => $nameServers,
                 "LockStatus"              => $eppLock,
                 "PrivacyProtectionStatus" => $privacyLock,
-                "AdministrativeContact"   => $this->validateContact( $contacts["Administrative"]),
-                "BillingContact"          => $this->validateContact( $contacts["Billing"]),
-                "TechnicalContact"        => $this->validateContact( $contacts["Technical"]),
-                "RegistrantContact"       => $this->validateContact( $contacts["Registrant"])
+                "AdministrativeContact"   => $this->validateContact($contacts["Administrative"]),
+                "BillingContact"          => $this->validateContact($contacts["Billing"]),
+                "TechnicalContact"        => $this->validateContact($contacts["Technical"]),
+                "RegistrantContact"       => $this->validateContact($contacts["Registrant"])
             ]
         ];
 
@@ -1549,39 +1246,27 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
-     * Modifies the privacy protection status of a domain
-     * 
-     * @param string $domainName The domain name to modify privacy protection for
-     * @param bool   $status     New privacy protection status (true to enable, false to disable)
-     * @param string $reason     Reason for the modification (default: "Owner request")
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type bool "PrivacyProtectionStatus" Updated privacy protection status
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When domain name is invalid, status change is not allowed, or operation fails
+     * Modify privacy protection status
+     *
+     * @param string $domainName Domain name to modify
+     * @param bool $status New privacy protection status
+     * @param string $reason Reason for modification
+     * @return array Operation result
+     * @see examples/ModifyPrivacyProtectionStatus.php
      */
     public function ModifyPrivacyProtectionStatus($domainName, $status, $reason = self::DEFAULT_REASON)
     {
         $parameters = [
             "request" => [
-                "DomainName" => $domainName,
+                "DomainName"     => $domainName,
                 "ProtectPrivacy" => $status,
-                "Reason" => trim($reason) ?: self::DEFAULT_REASON
+                "Reason"         => trim($reason) ?: self::DEFAULT_REASON
             ]
         ];
 
         return self::parseCall(__FUNCTION__, $parameters, function ($response) use ($parameters) {
             return [
-                'data' => [
+                'data'   => [
                     'PrivacyProtectionStatus' => $parameters["request"]["ProtectPrivacy"]
                 ],
                 'result' => 'OK'
@@ -1590,44 +1275,12 @@ class DomainNameAPI_PHPLibrary
     }
 
 
-        /**
-     * Synchronizes domain information with the registry
-     * 
-     * @param string $domainName The domain name to synchronize
-     * 
-     * @return array {
-     *     @type string "result"  Operation result ('OK' or 'ERROR')
-     *     @type array  "data" {
-     *         @type string "ID"                 Domain ID
-     *         @type string "Status"             Domain status
-     *         @type string "DomainName"         Full domain name
-     *         @type string "AuthCode"           Transfer authorization code
-     *         @type bool   "LockStatus"         Domain lock status
-     *         @type bool   "PrivacyProtectionStatus" Privacy protection status
-     *         @type bool   "IsChildNameServer"  Child nameserver status
-     *         @type array  "Contacts" {
-     *             @type array "Billing"         Billing contact details
-     *             @type array "Technical"       Technical contact details
-     *             @type array "Administrative"  Administrative contact details
-     *             @type array "Registrant"      Registrant contact details
-     *         }
-     *         @type array  "Dates" {
-     *             @type string "Start"          Registration date
-     *             @type string "Expiration"     Expiration date
-     *             @type int    "RemainingDays"  Days until expiration
-     *         }
-     *         @type array  "NameServers"        List of nameservers
-     *         @type array  "Additional"         Additional domain attributes
-     *         @type array  "ChildNameServers"   Child nameserver information
-     *     }
-     *     @type array  "error"   Error details if operation fails {
-     *         @type string "Code"    Error code
-     *         @type string "Message" Error message
-     *         @type string "Details" Detailed error information
-     *     }
-     * }
-     * 
-     * @throws Exception When domain name is invalid or synchronization fails
+    /**
+     * Synchronize domain information with registry
+     *
+     * @param string $domainName Domain name to synchronize
+     * @return array Updated domain information
+     * @see examples/SyncFromRegistry.php
      */
     public function SyncFromRegistry($domainName)
     {
@@ -1659,11 +1312,14 @@ class DomainNameAPI_PHPLibrary
 
             return $result;
         });
-
     }
 
-
-    // Convert object to array
+    /**
+     * Convert object to array
+     *
+     * @param mixed $_obj Object to convert
+     * @return array Converted array
+     */
     private function objectToArray($_obj)
     {
         try {
@@ -1674,7 +1330,15 @@ class DomainNameAPI_PHPLibrary
     }
 
     // Get error if exists
-    private function parseError($response,$trace=true)
+
+    /**
+     * Parse error from response
+     *
+     * @param array $response API response
+     * @param bool $trace Whether to send error to Sentry
+     * @return array|false Error details or false if no error
+     */
+    private function parseError($response, $trace = true)
     {
         $result = false;
 
@@ -1751,20 +1415,32 @@ class DomainNameAPI_PHPLibrary
             }
         }
 
-        if (isset($result["Code"]) && $trace===true) {
+        if (isset($result["Code"]) && $trace === true) {
             $this->sendErrorToSentryAsync(new Exception("API_ERROR: " . $result["Code"] . " - " . $result["Message"] . " - " . $result["Details"]));
         }
 
         return $result;
     }
 
-    // Check if response contains error
+    /**
+     * Check if response contains error
+     *
+     * @param array $response API response
+     * @return bool True if response has error
+     */
     private function hasError($response)
     {
         return !(($this->parseError($response, false) === false));
     }
 
-    // Set error message
+    /**
+     * Set error message
+     *
+     * @param string $Code Error code
+     * @param string $Message Error message
+     * @param string $Details Error details
+     * @return array Error information
+     */
     private function setError($Code, $Message, $Details)
     {
         $result            = [];
@@ -1774,7 +1450,12 @@ class DomainNameAPI_PHPLibrary
         return $result;
     }
 
-    // Parse domain info
+    /**
+     * Parse domain information from response
+     *
+     * @param array $data Domain data from API
+     * @return array Parsed domain information
+     */
     private function parseDomainInfo($data)
     {
         $result                                     = [];
@@ -1972,38 +1653,13 @@ class DomainNameAPI_PHPLibrary
         return $result;
     }
 
-
-    /* Parses contact information from the provided data array.
- *
- * @param array $data The data array containing contact information.
- *
- * @return array An associative array with the parsed contact information, including:
- *   - string ID
- *   - string Status
- *   - string AuthCode
- *   - string FirstName
- *   - string LastName
- *   - string Company
- *   - string EMail
- *   - string Type
- *   - array Address
- *     - string Line1
- *     - string Line2
- *     - string Line3
- *     - string State
- *     - string City
- *     - string Country
- *     - string ZipCode
- *   - array Phone
- *     - array Phone
- *       - string Number
- *       - string CountryCode
- *     - array Fax
- *       - string Number
- *       - string CountryCode
- *   - array Additional
- */
-    private function parseContactInfo($data)
+    /**
+     * Parse contact information from response
+     *
+     * @param array $data Contact data from API
+     * @return array Parsed contact information
+     */
+    private function parseContactInfo($data): array
     {
         $result = [
             "ID"         => isset($data["Id"]) && is_numeric($data["Id"]) ? $data["Id"] : "",
@@ -2048,7 +1704,15 @@ class DomainNameAPI_PHPLibrary
         return $result;
     }
 
-    private function parseCall($fn, $parameters, $_callback)
+    /**
+     * Parse API call and handle response
+     *
+     * @param string $fn Function name
+     * @param array $parameters Request parameters
+     * @param callable $_callback Response handler function
+     * @return array Parsed response
+     */
+    private function parseCall($fn, $parameters, $_callback): array
     {
         $result = [
             'result' => 'ERROR',
@@ -2071,6 +1735,7 @@ class DomainNameAPI_PHPLibrary
             $this->setLastFunction($fn);
             $this->setRequestData($parameters);
             $this->setResponseData($_response);
+            //$this->setResponseHeaders($this->service->__getLastResponseHeaders());
 
             // Check for errors in the response
             if (!$this->hasError($_response)) {
@@ -2096,29 +1761,55 @@ class DomainNameAPI_PHPLibrary
         return $result;
     }
 
+    /**
+     * Validate and normalize contact information
+     *
+     * @param array $contact Contact data to validate
+     * @return array Validated contact information
+     */
     public function validateContact($contact)
     {
-        // BUG-5335 - Contact validation
+        // Varsayılan değerleri tanımla
+        $defaults = [
+            "FirstName"        => "Isimyok",
+            "LastName"         => "Isimyok",
+            "AddressLine1"     => "Addres yok",
+            "City"             => "ISTANBUL",
+            "Country"          => "TR",
+            "ZipCode"          => "34000",
+            "Phone"            => "5555555555",
+            "PhoneCountryCode" => "90"
+        ];
+
+        // Eksik anahtarları varsayılan değerlerle doldur
+        foreach ($defaults as $key => $value) {
+            if (!isset($contact[$key])) {
+                $contact[$key] = $value;
+            }
+        }
+
+        // Boş değerleri kontrol et ve varsayılan değerlerle doldur
         if (strlen(trim($contact["FirstName"])) == 0) {
-            $contact["FirstName"] = 'Isimyok';
+            $contact["FirstName"] = $defaults["FirstName"];
         }
         if (strlen(trim($contact["LastName"])) == 0) {
             $contact["LastName"] = $contact["FirstName"];
         }
         if (strlen(trim($contact["AddressLine1"])) == 0) {
-            $contact["AddressLine1"] = 'Addres yok';
+            $contact["AddressLine1"] = $defaults["AddressLine1"];
         }
         if (strlen(trim($contact["City"])) == 0) {
-            $contact["City"] = 'ISTANBUL';
+            $contact["City"] = $defaults["City"];
         }
         if (strlen(trim($contact["Country"])) == 0) {
-            $contact["Country"] = 'TR';
+            $contact["Country"] = $defaults["Country"];
         }
         if (strlen(trim($contact["ZipCode"])) == 0) {
-            $contact["ZipCode"] = '34000';
+            $contact["ZipCode"] = $defaults["ZipCode"];
         }
 
-        $tmpPhone = preg_replace('/[^0-9]/', '', $contact["Phone"]);
+        // Telefon numarası işleme
+        $tmpPhone = isset($contact["Phone"]) ? preg_replace('/[^0-9]/', '', $contact["Phone"]) : '';
         if (strlen($tmpPhone) == 10) {
             $contact["PhoneCountryCode"] = '';
             $contact["Phone"]            = $tmpPhone;
@@ -2129,20 +1820,19 @@ class DomainNameAPI_PHPLibrary
             $contact["PhoneCountryCode"] = substr($tmpPhone, 0, 2);
             $contact["Phone"]            = substr($tmpPhone, 2);
         } else {
-            $contact["PhoneCountryCode"] = '90';
-            $contact["Phone"]            = $tmpPhone;
+            $contact["PhoneCountryCode"] = $defaults["PhoneCountryCode"];
+            $contact["Phone"]            = $tmpPhone ?: $defaults["Phone"];
         }
 
         if (strlen(trim($contact["PhoneCountryCode"])) == 0) {
-            $contact["PhoneCountryCode"] = '90';
+            $contact["PhoneCountryCode"] = $defaults["PhoneCountryCode"];
         }
         if (strlen(trim($contact["Phone"])) == 0) {
-            $contact["Phone"] = '5555555555';
+            $contact["Phone"] = $defaults["Phone"];
         }
 
         return $contact;
     }
-
 
 
     /**
@@ -2152,10 +1842,8 @@ class DomainNameAPI_PHPLibrary
      */
     public function isTrTLD($domain)
     {
-        //preg_match('/\.com\.tr|\.net\.tr|\.org\.tr|\.biz\.tr|\.info\.tr|\.tv\.tr|\.gen\.tr|\.web\.tr|\.tel\.tr|\.name\.tr|\.bbs\.tr|\.gov\.tr|\.bel\.tr|\.pol\.tr|\.edu\.tr|\.k12\.tr|\.av\.tr|\.dr\.tr$/',  $domain, $result);
-
         preg_match('/\.tr$/', $domain, $result);
-        
+
         return isset($result[0]);
     }
 
@@ -2173,13 +1861,13 @@ class DomainNameAPI_PHPLibrary
         $skipped_errors = self::DEFAULT_IGNORED_ERRORS;
 
         foreach ($skipped_errors as $ek => $ev) {
-            if(strpos($e->getMessage(),$ev) !== false){
-                return ;
+            if (strpos($e->getMessage(), $ev) !== false) {
+                return;
             }
         }
 
         $elapsed_time = microtime(true) - $this->startAt;
-        $parsed_dsn = parse_url($this->errorReportingDsn);
+        $parsed_dsn   = parse_url($this->errorReportingDsn);
 
         // API URL'si
         $host       = $parsed_dsn['host'];
@@ -2192,23 +1880,35 @@ class DomainNameAPI_PHPLibrary
 
 
         $knownPath = __FILE__;
-        $errFile=$e->getFile();
+        $errFile   = $e->getFile();
         $vhostUser = '';
 
 
-        if (preg_match('/\/home\/([^\/]+)\//', $knownPath, $matches)) {
-            $vhostUser = $matches[1];
-        }
-        if($vhostUser==''){
+        try {
             $vhostUser = get_current_user();
+        } catch (Exception $ex) {
+            $vhostUser = '';
         }
-
-        if (strlen($this->errorReportingPath)>0) {
-            if (strpos($knownPath, $this->errorReportingPath) !== false) {
-                $knownPath = substr($knownPath, strpos($knownPath, $this->errorReportingPath) + strlen($this->errorReportingPath));
-                $errFile = substr($errFile, strpos($errFile, $this->errorReportingPath) + strlen($this->errorReportingPath));
+        if ($vhostUser == '') {
+            if (preg_match('/\/home\/([^\/]+)\//', $knownPath, $matches)) {
+                $vhostUser = $matches[1];
             }
         }
+
+
+        if (strlen($this->errorReportingPath) > 0) {
+            if (strpos($knownPath, $this->errorReportingPath) !== false) {
+                $knownPath = substr($knownPath,
+                    strpos($knownPath, $this->errorReportingPath) + strlen($this->errorReportingPath));
+                $errFile   = substr($errFile,
+                    strpos($errFile, $this->errorReportingPath) + strlen($this->errorReportingPath));
+            }
+        }
+
+
+
+
+
 
         // Hata verisi
         $errorData = [
@@ -2224,14 +1924,18 @@ class DomainNameAPI_PHPLibrary
             'exception' => [
                 'values' => [
                     [
-                        'type'       =>  str_replace(['DomainNameApi\DomainNameAPI_PHPLibrary'],[$this->application.' Exception'],self::class),
+                        'type'       => str_replace(['DomainNameApi\DomainNameAPI_PHPLibrary'],
+                            [$this->application . ' Exception'], self::class),
                         'value'      => $e->getMessage(),
                         'stacktrace' => [
                             'frames' => [
                                 [
                                     'filename' => $errFile,
                                     'lineno'   => $e->getLine(),
-                                    'function' => str_replace([dirname(__DIR__),'DomainNameApi\DomainNameAPI_PHPLibrary'],['.','Lib'],$e->getTraceAsString()),
+                                    'function' => str_replace([
+                                        dirname(__DIR__),
+                                        'DomainNameApi\DomainNameAPI_PHPLibrary'
+                                    ], ['.', 'Lib'], $e->getTraceAsString()),
                                 ]
                             ]
                         ]
@@ -2243,17 +1947,18 @@ class DomainNameAPI_PHPLibrary
                 'level'           => 'error',
                 'release'         => self::VERSION,
                 'environment'     => 'production',
-                'url'             => $_SERVER['REQUEST_URI'] ?? 'unknown',
-                'transaction'     => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
-                'status_code'     => http_response_code(),
+                'url'             => $_SERVER['REQUEST_URI'] ?? 'NA',
+                'transaction'     => $_SERVER['REQUEST_METHOD'] ?? 'NA',
                 'trace_id'        => bin2hex(random_bytes(8)), // Trace ID örneği
                 'runtime_name'    => 'PHP',
                 'runtime_version' => phpversion(),
                 'ip_address'      => $external_ip,
-                'elapsed_time'    => number_format($elapsed_time,4),
+                'elapsed_time'    => number_format($elapsed_time, 4),
                 'vhost_user'      => $vhostUser,
                 'application'     => $this->application,
-
+                'extension_soap'  => extension_loaded('soap') ? 'enabled' : 'disabled',
+                'openssl_v'       => defined('OPENSSL_VERSION_TEXT') ? OPENSSL_VERSION_TEXT : 'NA',
+                'openssl_n'       => defined('OPENSSL_VERSION_NUMBER') ? OPENSSL_VERSION_NUMBER : 'NA',
             ],
             'extra'     => [
                 'request_data'  => $this->getRequestData(),
@@ -2272,32 +1977,37 @@ class DomainNameAPI_PHPLibrary
         }
         $sentry_auth_header = 'X-Sentry-Auth: Sentry ' . implode(', ', $sentry_auth);
 
-        if(function_exists('escapeshellarg') && function_exists('exec')){
-        $cmd = 'curl -X POST ' . escapeshellarg($api_url) . ' -H ' . escapeshellarg('Content-Type: application/json') . ' -H ' . escapeshellarg($sentry_auth_header) . ' -d ' . escapeshellarg(json_encode($errorData)) . ' > /dev/null 2>&1 &';
-        exec($cmd);
-        }else{
-             $jsonData = json_encode($errorData);
-                $ch = curl_init();
-                curl_setopt($ch, CURLOPT_URL, $api_url);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-                curl_setopt($ch, CURLOPT_POST, 1);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 2);
-                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                    'Content-Type: application/json',
-                    $sentry_auth_header
-                ]);
-                curl_exec($ch);
-                curl_close($ch);
+        if (function_exists('escapeshellarg') && function_exists('exec')) {
+            $cmd = 'curl -X POST ' . escapeshellarg($api_url) . ' -H ' . escapeshellarg('Content-Type: application/json') . ' -H ' . escapeshellarg($sentry_auth_header) . ' -d ' . escapeshellarg(json_encode($errorData)) . ' > /dev/null 2>&1 &';
+            exec($cmd);
+        } else {
+            $jsonData = json_encode($errorData);
+            $ch       = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $api_url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                $sentry_auth_header
+            ]);
+            curl_exec($ch);
+            curl_close($ch);
         }
     }
 
+    /**
+     * Get server's external IP address
+     *
+     * @return string Server IP address
+     */
     private function getServerIp()
     {
         $cache_ttl    = self::DEFAULT_CACHE_TTL;
         $cache_key    = 'external_ip';
-        $cache_file = __DIR__ . '/ip_addr.cache';
+        $cache_file   = __DIR__ . '/ip_addr.cache';
         $current_time = time();
 
         if (function_exists('apcu_fetch')) {
@@ -2329,9 +2039,9 @@ class DomainNameAPI_PHPLibrary
                 file_put_contents($cache_file, $external_ip);
             }
 
-                return $external_ip;
+            return $external_ip;
         } catch (Exception $e) {
-        return 'unknown';
+            return 'unknown';
         }
     }
 
