@@ -20,7 +20,7 @@ new DomainNameApi\Services\Language();
 
 function domainnameapi_version(): string
 {
-    return '2.2.0';
+    return '2.2.1';
 }
 
 function domainnameapi_getConfigArray($params) {
