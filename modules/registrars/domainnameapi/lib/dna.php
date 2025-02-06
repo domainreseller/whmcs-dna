@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.6
+ * @version 2.1.7
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.6';
+    const VERSION = '2.1.7';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -39,6 +39,84 @@ class DomainNameAPI_PHPLibrary
         '*Domain is not in updateable status. It must be active*',
         '*balance is not sufficient*',
         '*Price definition not found*',
+    ];
+
+    const DEFAULT_ERRORS = [
+        'INVALID_DOMAIN_DETAILS' => [
+            'code' => 'INVALID_DOMAIN_DETAILS',
+            'message' => 'Invalid domain details! Details format is not valid',
+            'description' => 'The provided domain details are not in the expected format'
+        ],
+        'INVALID_CREDENTIALS' => [
+            'code' => 'INVALID_CREDENTIALS', 
+            'message' => 'Invalid username and password',
+            'description' => 'The provided API credentials are invalid'
+        ],
+        'INVALID_DOMAIN_LIST' => [
+            'code' => 'INVALID_DOMAIN_LIST',
+            'message' => 'Domain info is not a valid array or more than one domain info has returned!',
+            'description' => 'The domain list response is not in the expected format'
+        ],
+        'INVALID_TLD_LIST' => [
+            'code' => 'INVALID_TLD_LIST',
+            'message' => 'TLD info is not a valid array or more than one TLD info has returned!',
+            'description' => 'The TLD list response is not in the expected format'
+        ],
+        'INVALID_RESPONSE' => [
+            'code' => 'INVALID_RESPONSE',
+            'message' => 'Invalid response received from server! Response is empty.',
+            'description' => 'The API response is empty or null'
+        ],
+        'INVALID_RESPONSE_FORMAT' => [
+            'code' => 'INVALID_RESPONSE_FORMAT',
+            'message' => 'Invalid response received from server! Response format is not valid.',
+            'description' => 'The API response format is not in the expected structure'
+        ],
+        'INVALID_RESPONSE_COUNT' => [
+            'code' => 'INVALID_RESPONSE_COUNT',
+            'message' => 'Invalid parameters passed to function! Response data contains more than one result!',
+            'description' => 'The API response contains multiple results when only one was expected'
+        ],
+        'INVALID_RESPONSE_CODE' => [
+            'code' => 'INVALID_RESPONSE_CODE',
+            'message' => 'Invalid parameters passed to function! Operation result or Error code not received from server',
+            'description' => 'The API response is missing required operation result or error code fields'
+        ],
+        'INVALID_RESPONSE_SOAP' => [
+            'code' => 'INVALID_RESPONSE_SOAP',
+            'message' => 'Invalid parameters passed to function! Soap return is not a valid array!',
+            'description' => 'The SOAP response is not in a valid array format'
+        ],
+        'INVALID_CONTACT_INFO' => [
+            'code' => 'INVALID_CONTACT_INFO',
+            'message' => 'Invalid response received from server! Contact info is not a valid array or more than one contact info has returned!',
+            'description' => 'The contact information response is not in the expected format'
+        ],
+        'INVALID_CONTACT_SAVE' => [
+            'code' => 'INVALID_CONTACT_SAVE',
+            'message' => 'Invalid response received from server! Contact info could not be saved!',
+            'description' => 'The contact information could not be saved on the server'
+        ],
+        'INVALID_DOMAIN_TRANSFER_REQUEST' => [
+            'code' => 'INVALID_DOMAIN_TRANSFER_REQUEST',
+            'message' => 'Invalid response received from server! Domain transfer request could not be completed!',
+            'description' => 'The domain transfer request failed to complete'
+        ],
+        'INVALID_DOMAIN_RENEW' => [
+            'code' => 'INVALID_DOMAIN_RENEW',
+            'message' => 'Invalid response received from server! Domain renew request could not be completed!',
+            'description' => 'The domain renewal request failed to complete'
+        ],
+        'INVALID_DOMAIN_REGISTER' => [
+            'code' => 'INVALID_DOMAIN_REGISTER',
+            'message' => 'Invalid response received from server! Domain register request could not be completed!',
+            'description' => 'The domain registration request failed to complete'
+        ],
+        'INVALID_DOMAIN_SYNC' => [
+            'code' => 'INVALID_DOMAIN_SYNC',
+            'message' => 'Invalid response received from server! Domain sync request could not be completed!',
+            'description' => 'The domain synchronization request failed to complete'
+        ]
     ];
 
     const DEFAULT_CACHE_TTL = 512;
@@ -179,7 +257,7 @@ class DomainNameAPI_PHPLibrary
     {
         $dir                      = __DIR__;
         $this->application        = 'CORE';
-        $this->errorReportingPath = '';
+        $this->errorReportingPath = self::APPLICATIONS['CORE']['path'];
         $this->errorReportingDsn  = self::APPLICATIONS['CORE']['dsn'];
 
         foreach (self::APPLICATIONS as $app => $config) {
@@ -189,13 +267,6 @@ class DomainNameAPI_PHPLibrary
                 $this->errorReportingDsn  = $config['dsn'];
                 break;
             }
-        }
-
-        // Geçerli bir uygulama değilse CORE'a geri dön
-        if (!array_key_exists($this->application, self::APPLICATIONS)) {
-            $this->application        = 'CORE';
-            $this->errorReportingPath = self::APPLICATIONS['CORE']['path'];
-            $this->errorReportingDsn  = self::APPLICATIONS['CORE']['dsn'];
         }
     }
 
@@ -401,8 +472,7 @@ class DomainNameAPI_PHPLibrary
                 $resp['balances'] = $balances;
             } else {
                 $resp['result'] = 'ERROR';
-                $resp['error']  = $this->setError("INVALID_CREDINENTIALS", "Invalid response received from server!",
-                    "invalid username and password");
+                $resp['error']  = $this->setError("INVALID_CREDINENTIALS");
             }
 
 
@@ -555,10 +625,9 @@ class DomainNameAPI_PHPLibrary
             } else {
                 // Set error
                 $result["result"] = "ERROR";
-                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!",
-                    "Domain info is not a valid array or more than one domain info has returned!");
+                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST");
 
-                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_LIST: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
+                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_LIST] ". self::DEFAULT_ERRORS['INVALID_DOMAIN_LIST']['description']));
             }
             return $result;
         });
@@ -624,10 +693,9 @@ class DomainNameAPI_PHPLibrary
                 // Set error
                 $result = [
                     'result' => 'ERROR',
-                    'error'  => $this->setError("INVALID_TLD_LIST", "Invalid response received from server!",
-                        "Domain info is not a valid array or more than one domain info has returned!")
+                    'error'  => $this->setError("INVALID_TLD_LIST")
                 ];
-                $this->sendErrorToSentryAsync(new Exception("INVALID_TLD_LIST: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
+                $this->sendErrorToSentryAsync(new Exception("[INVALID_TLD_LIST] ". self::DEFAULT_ERRORS['INVALID_TLD_LIST']['description']));
             }
 
             return $result;
@@ -655,22 +723,18 @@ class DomainNameAPI_PHPLibrary
 
         $response = self::parseCall(__FUNCTION__, $parameters, function ($response) {
             $data = $response[key($response)];
-
-            $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_LIST: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
-
-
             // If DomainInfo a valid array
             if (isset($data["DomainInfo"]) && is_array($data["DomainInfo"])) {
                 // Parse domain info
+
                 $result["data"]   = $this->parseDomainInfo($data["DomainInfo"]);
                 $result["result"] = "OK";
             } else {
                 // Set error
                 $result["result"] = "ERROR";
-                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST", "Invalid response received from server!",
-                    "Domain info is not a valid array or more than one domain info has returned!");
+                $result["error"]  = $this->setError("INVALID_DOMAIN_DETAILS");
 
-                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_LIST: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
+                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_DETAILS] ". self::DEFAULT_ERRORS['INVALID_DOMAIN_DETAILS']['description']));
             }
             return $result;
         });
@@ -911,11 +975,10 @@ class DomainNameAPI_PHPLibrary
             } else {
                 // Set error
                 $result = [
-                    'error'  => $this->setError("INVALID_CONTACT_INTO", "Invalid response received from server!",
-                        "Contact info is not a valid array or more than one contact info has returned!"),
+                    'error'  => $this->setError("INVALID_CONTACT_INFO"),
                     'result' => 'ERROR'
                 ];
-                $this->sendErrorToSentryAsync(new Exception("INVALID_CONTACT_INTO: Invalid response received from server! Contact info is not a valid array or more than one contact info has returned!"));
+                $this->sendErrorToSentryAsync(new Exception("[INVALID_CONTACT_INFO] ". self::DEFAULT_ERRORS['INVALID_CONTACT_INFO']['description']));
             }
             return $result;
         });
@@ -958,11 +1021,10 @@ class DomainNameAPI_PHPLibrary
                 // Set error
                 $result = [
                     'result' => 'ERROR',
-                    'error'  => $this->setError("INVALID_CONTACT_SAVE", "Invalid response received from server!",
-                        "Contact info is not a valid array or more than one contact info has returned!")
+                    'error'  => $this->setError("INVALID_CONTACT_SAVE")
                 ];
 
-                $this->sendErrorToSentryAsync(new Exception("INVALID_CONTACT_SAVE: Invalid response received from server! Contact info is not a valid array or more than one contact info has returned!"));
+                $this->sendErrorToSentryAsync(new Exception("[INVALID_CONTACT_SAVE] ". self::DEFAULT_ERRORS['INVALID_CONTACT_SAVE']['description']));
             }
             return $result;
         });
@@ -1012,11 +1074,9 @@ class DomainNameAPI_PHPLibrary
                 // Set error
                 $result = [
                     'result' => 'ERROR',
-                    'data'   => $this->setError("INVALID_DOMAIN_TRANSFER_REQUEST",
-                        "Invalid response received from server!",
-                        "Domain info is not a valid array or more than one domain info has returned!")
+                    'data'   => $this->setError("INVALID_DOMAIN_TRANSFER_REQUEST")
                 ];
-                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_TRANSFER_REQUEST: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
+                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_TRANSFER_REQUEST] ". self::DEFAULT_ERRORS['INVALID_DOMAIN_TRANSFER_REQUEST']['description']));
             }
             return $result;
         });
@@ -1148,10 +1208,9 @@ class DomainNameAPI_PHPLibrary
             } else {
                 return [
                     'result' => 'ERROR',
-                    'error'  => $this->setError("INVALID_DOMAIN_RENEW", "Invalid response received from server!",
-                        "Domain info is not a valid array or more than one domain info has returned!")
+                    'error'  => $this->setError("INVALID_DOMAIN_RENEW")
                 ];
-                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_RENEW: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
+                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_RENEW] ". self::DEFAULT_ERRORS['INVALID_DOMAIN_RENEW']['description']));
             }
         });
 
@@ -1232,10 +1291,9 @@ class DomainNameAPI_PHPLibrary
                 // Set error
                 $result = [
                     'result' => 'ERROR',
-                    'error'  => $this->setError("INVALID_DOMAIN_REGISTER", "Invalid response received from server!",
-                        "Domain info is not a valid array or more than one domain info has returned!")
+                    'error'  => $this->setError("INVALID_DOMAIN_REGISTER")
                 ];
-                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_REGISTER: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
+                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_REGISTER] ". self::DEFAULT_ERRORS['INVALID_DOMAIN_REGISTER']['description']));
             }
             return $result;
         });
@@ -1303,11 +1361,10 @@ class DomainNameAPI_PHPLibrary
             } else {
                 // Set error
                 $result = [
-                    'error'  => $this->setError("INVALID_DOMAIN_SYNC", "Invalid response received from server!",
-                        "Domain info is not a valid array or more than one domain info has returned!"),
+                    'error'  => $this->setError("INVALID_DOMAIN_SYNC"),
                     'result' => 'ERROR'
                 ];
-                $this->sendErrorToSentryAsync(new Exception("INVALID_DOMAIN_SYNC: Invalid response received from server! Domain info is not a valid array or more than one domain info has returned!"));
+                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_SYNC] ". self::DEFAULT_ERRORS['INVALID_DOMAIN_SYNC']['description']));
             }
 
             return $result;
@@ -1346,17 +1403,16 @@ class DomainNameAPI_PHPLibrary
             // Set error data
             $result            = [];
             $result["Code"]    = "INVALID_RESPONSE";
-            $result["Message"] = "Invalid response or no response received from server!";
-            $result["Details"] = "SOAP Connection returned null value!";
+            $result["Message"] = self::DEFAULT_ERRORS['INVALID_RESPONSE']['message'];
+            $result["Details"] = self::DEFAULT_ERRORS['INVALID_RESPONSE']['description'];
         } elseif (!is_array($response)) {
             // Set error data
             $result            = [];
-            $result["Code"]    = "INVALID_RESPONSE";
-            $result["Message"] = "Invalid response or no response received from server!";
-            $result["Details"] = "SOAP Connection returned non-array value!";
+            $result["Code"]    = "INVALID_RESPONSE_FORMAT";
+            $result["Message"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_FORMAT']['message'];
+            $result["Details"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_FORMAT']['description'];
         } elseif (strtolower(key($response)) == "faultstring") {
             // Handle soap fault
-
             $result            = [];
             $result["Code"]    = "";
             $result["Message"] = "";
@@ -1383,22 +1439,21 @@ class DomainNameAPI_PHPLibrary
         } elseif (count($response) != 1) {
             // Set error data
             $result            = [];
-            $result["Code"]    = "INVALID_RESPONSE";
-            $result["Message"] = "Invalid response or no response received from server!";
-            $result["Details"] = "Response data contains more than one result! Only one result accepted!";
+            $result["Code"]    = "INVALID_RESPONSE_COUNT";
+            $result["Message"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_COUNT']['message'];
+            $result["Details"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_COUNT']['description'];
         } elseif (!isset($response[key($response)]["OperationResult"]) || !isset($response[key($response)]["ErrorCode"])) {
             // Set error data
             $result            = [];
-            $result["Code"]    = "INVALID_RESPONSE";
-            $result["Message"] = "Invalid response or no response received from server!";
-            $result["Details"] = "Operation result or Error code not received from server!";
+            $result["Code"]    = "INVALID_RESPONSE_CODE";
+            $result["Message"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_CODE']['message'];
+            $result["Details"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_CODE']['description'];
         } elseif (strtoupper($response[key($response)]["OperationResult"]) != "SUCCESS") {
             // Set error data
             $result = [
                 "Code"    => '',
                 "Message" => 'Failed',
                 "Details" => '',
-
             ];
 
             if (isset($response[key($response)]["OperationMessage"])) {
@@ -1416,7 +1471,7 @@ class DomainNameAPI_PHPLibrary
         }
 
         if (isset($result["Code"]) && $trace === true) {
-            $this->sendErrorToSentryAsync(new Exception("API_ERROR: " . $result["Code"] . " - " . $result["Message"] . " - " . $result["Details"]));
+            $this->sendErrorToSentryAsync(new Exception("[API_ERROR]: " . $result["Code"] . " - " . $result["Message"] . " - " . $result["Details"]));
         }
 
         return $result;
@@ -1436,17 +1491,24 @@ class DomainNameAPI_PHPLibrary
     /**
      * Set error message
      *
-     * @param string $Code Error code
-     * @param string $Message Error message
-     * @param string $Details Error details
+     * @param string $code Error code
+     * @param string $message Error message
+     * @param string $details Error details
      * @return array Error information
      */
-    private function setError($Code, $Message, $Details)
+    private function setError($code, $message = '', $details = '')
     {
-        $result            = [];
-        $result["Code"]    = $Code;
-        $result["Message"] = $Message;
-        $result["Details"] = $Details;
+        $result = [];
+        if (isset(self::DEFAULT_ERRORS[$code])) {
+            $error = self::DEFAULT_ERRORS[$code];
+            $result["Code"] = $error['code'];
+            $result["Message"] = $error['message'];
+            $result["Details"] = $error['description'];
+        } else {
+            $result["Code"] = $code;
+            $result["Message"] = $message;
+            $result["Details"] = $details;
+        }
         return $result;
     }
 
@@ -1746,7 +1808,7 @@ class DomainNameAPI_PHPLibrary
             }
         } catch (SoapFault $ex) {
             $result["result"] = "ERROR";
-            $result["error"]  = $this->setError('INVALID_RESPONSE', 'Invalid response occurred', $ex->getMessage());
+            $result["error"]  = $this->setError('INVALID_RESPONSE_SOAP', self::DEFAULT_ERRORS['INVALID_RESPONSE_SOAP']['description'], $ex->getMessage());
             $this->sendErrorToSentryAsync($ex);
         } catch (Exception $ex) {
             $result["result"] = "ERROR";
