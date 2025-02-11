@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.8
+ * @version 2.1.9
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.8';
+    const VERSION = '2.1.9';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -125,23 +125,23 @@ class DomainNameAPI_PHPLibrary
 
     private const APPLICATIONS = [
         'WHMCS'          => [
-            'path' => '/modules/registrars/domainnameapi/',
+            'path' => 'modules/registrars/domainnameapi',
             'dsn'  => 'https://cbaee35fa4d2836942641e10c2109cb6@sentry.atakdomain.com/9'
         ],
         'WISECP'         => [
-            'path' => '/coremio/modules/Registrars/DomainNameAPI/',
+            'path' => 'coremio/modules/Registrars/DomainNameAPI',
             'dsn'  => 'https://16578e3378f7d6c329ff95d9573bc6fa@sentry.atakdomain.com/8'
         ],
         'HOSTBILL'       => [
-            'path' => '/includes/modules/Domain/domainnameapi/',
+            'path' => 'includes/modules/Domain/domainnameapi',
             'dsn'  => 'https://be47804b215cb479dbfc44db5c662549@sentry.atakdomain.com/11'
         ],
         'BLESTA'         => [
-            'path' => '/components/modules/domainnameapi/',
+            'path' => 'components/modules/domainnameapi',
             'dsn'  => 'https://8f8ed6f84abaa93ff49b56f15d3c1f38@sentry.atakdomain.com/10'
         ],
         'CLIENTEXEC'     => [
-            'path' => '/plugins/registrars/domainnameapi/',
+            'path' => 'plugins/registrars/domainnameapi',
             'dsn'  => 'https://033791219211d863fdb9c08b328ba058@sentry.atakdomain.com/13'
         ],
         'CORE'           => [
@@ -255,7 +255,7 @@ class DomainNameAPI_PHPLibrary
 
     private function setApplication()
     {
-        $dir                      = __DIR__;
+        $dir                      = __FILE__;
         $this->application        = 'CORE';
         $this->errorReportingPath = self::APPLICATIONS['CORE']['path'];
         $this->errorReportingDsn  = self::APPLICATIONS['CORE']['dsn'];
