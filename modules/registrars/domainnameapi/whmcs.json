@@ -1,5 +1,5 @@
 {
-  "schema": "2.2.3",
+  "schema": "2.2.4",
   "type": "whmcs-registrars",
   "name": "domainnameapi",
   "license": "proprietary",
