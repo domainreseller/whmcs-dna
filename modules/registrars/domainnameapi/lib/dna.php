@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.9
+ * @version 2.1.10
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.9';
+    const VERSION = '2.1.10';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -42,78 +42,78 @@ class DomainNameAPI_PHPLibrary
     ];
 
     const DEFAULT_ERRORS = [
-        'INVALID_DOMAIN_DETAILS'          => [
-            'code'        => 'INVALID_DOMAIN_DETAILS',
+        'DOMAIN_DETAILS'          => [
+            'code'        => 'DOMAIN_DETAILS',
             'message'     => 'Invalid domain details! Details format is not valid',
             'description' => 'The provided domain details are not in the expected format'
         ],
-        'INVALID_CREDENTIALS'             => [
-            'code'        => 'INVALID_CREDENTIALS',
+        'CREDENTIALS'             => [
+            'code'        => 'CREDENTIALS',
             'message'     => 'Invalid username and password',
             'description' => 'The provided API credentials are invalid'
         ],
-        'INVALID_DOMAIN_LIST'             => [
-            'code'        => 'INVALID_DOMAIN_LIST',
-            'message'     => 'Domain info is not a valid array or more than one domain info has returned!',
-            'description' => 'The domain list response is not in the expected format'
+        'DOMAIN_LIST'             => [
+            'code'        => 'DOMAIN_LIST',
+            'message'     => 'The domain list is invalid or contains multiple entries!',
+            'description' => 'The domain list response format is incorrect or unexpected'
         ],
-        'INVALID_TLD_LIST'                => [
-            'code'        => 'INVALID_TLD_LIST',
+        'TLD_LIST'                => [
+            'code'        => 'TLD_LIST',
             'message'     => 'TLD info is not a valid array or more than one TLD info has returned!',
             'description' => 'The TLD list response is not in the expected format'
         ],
-        'INVALID_RESPONSE'                => [
-            'code'        => 'INVALID_RESPONSE',
+        'RESPONSE'                => [
+            'code'        => 'RESPONSE',
             'message'     => 'Invalid response received from server! Response is empty.',
             'description' => 'The API response is empty or null'
         ],
-        'INVALID_RESPONSE_FORMAT'         => [
-            'code'        => 'INVALID_RESPONSE_FORMAT',
+        'RESPONSE_FORMAT'         => [
+            'code'        => 'RESPONSE_FORMAT',
             'message'     => 'Invalid response received from server! Response format is not valid.',
             'description' => 'The API response format is not in the expected structure'
         ],
-        'INVALID_RESPONSE_COUNT'          => [
-            'code'        => 'INVALID_RESPONSE_COUNT',
+        'RESPONSE_COUNT'          => [
+            'code'        => 'RESPONSE_COUNT',
             'message'     => 'Invalid parameters passed to function! Response data contains more than one result!',
             'description' => 'The API response contains multiple results when only one was expected'
         ],
-        'INVALID_RESPONSE_CODE'           => [
-            'code'        => 'INVALID_RESPONSE_CODE',
+        'RESPONSE_CODE'           => [
+            'code'        => 'RESPONSE_CODE',
             'message'     => 'Invalid parameters passed to function! Operation result or Error code not received from server',
             'description' => 'The API response is missing required operation result or error code fields'
         ],
-        'INVALID_RESPONSE_SOAP'           => [
-            'code'        => 'INVALID_RESPONSE_SOAP',
+        'RESPONSE_SOAP'           => [
+            'code'        => 'RESPONSE_SOAP',
             'message'     => 'Invalid parameters passed to function! Soap return is not a valid array!',
             'description' => 'The SOAP response is not in a valid array format'
         ],
-        'INVALID_CONTACT_INFO'            => [
-            'code'        => 'INVALID_CONTACT_INFO',
+        'CONTACT_INFO'            => [
+            'code'        => 'CONTACT_INFO',
             'message'     => 'Invalid response received from server! Contact info is not a valid array or more than one contact info has returned!',
             'description' => 'The contact information response is not in the expected format'
         ],
-        'INVALID_CONTACT_SAVE'            => [
-            'code'        => 'INVALID_CONTACT_SAVE',
+        'CONTACT_SAVE'            => [
+            'code'        => 'CONTACT_SAVE',
             'message'     => 'Invalid response received from server! Contact info could not be saved!',
             'description' => 'The contact information could not be saved on the server'
         ],
-        'INVALID_DOMAIN_TRANSFER_REQUEST' => [
-            'code'        => 'INVALID_DOMAIN_TRANSFER_REQUEST',
+        'DOMAIN_TRANSFER_REQUEST' => [
+            'code'        => 'DOMAIN_TRANSFER_REQUEST',
             'message'     => 'Invalid response received from server! Domain transfer request could not be completed!',
             'description' => 'The domain transfer request failed to complete'
         ],
-        'INVALID_DOMAIN_RENEW'            => [
-            'code'        => 'INVALID_DOMAIN_RENEW',
+        'DOMAIN_RENEW'            => [
+            'code'        => 'DOMAIN_RENEW',
             'message'     => 'Invalid response received from server! Domain renew request could not be completed!',
             'description' => 'The domain renewal request failed to complete'
         ],
-        'INVALID_DOMAIN_REGISTER'         => [
-            'code'        => 'INVALID_DOMAIN_REGISTER',
+        'DOMAIN_REGISTER'         => [
+            'code'        => 'DOMAIN_REGISTER',
             'message'     => 'Invalid response received from server! Domain register request could not be completed!',
             'description' => 'The domain registration request failed to complete'
         ],
-        'INVALID_DOMAIN_SYNC'             => [
-            'code'        => 'INVALID_DOMAIN_SYNC',
+        'DOMAIN_SYNC'             => [
+            'code'        => 'DOMAIN_SYNC',
             'message'     => 'Invalid response received from server! Domain sync request could not be completed!',
             'description' => 'The domain synchronization request failed to complete'
         ]
@@ -472,7 +472,7 @@ class DomainNameAPI_PHPLibrary
                 $resp['balances'] = $balances;
             } else {
                 $resp['result'] = 'ERROR';
-                $resp['error']  = $this->setError("INVALID_CREDINENTIALS");
+                $resp['error']  = $this->setError("CREDINENTIALS");
             }
 
 
@@ -625,9 +625,9 @@ class DomainNameAPI_PHPLibrary
             } else {
                 // Set error
                 $result["result"] = "ERROR";
-                $result["error"]  = $this->setError("INVALID_DOMAIN_LIST");
+                $result["error"]  = $this->setError("DOMAIN_LIST");
 
-                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_LIST] " . self::DEFAULT_ERRORS['INVALID_DOMAIN_LIST']['description']));
+                $this->sendErrorToSentryAsync(new Exception("[DOMAIN_LIST] " . self::DEFAULT_ERRORS['DOMAIN_LIST']['description']));
             }
             return $result;
         });
@@ -693,9 +693,9 @@ class DomainNameAPI_PHPLibrary
                 // Set error
                 $result = [
                     'result' => 'ERROR',
-                    'error'  => $this->setError("INVALID_TLD_LIST")
+                    'error'  => $this->setError("TLD_LIST")
                 ];
-                $this->sendErrorToSentryAsync(new Exception("[INVALID_TLD_LIST] " . self::DEFAULT_ERRORS['INVALID_TLD_LIST']['description']));
+                $this->sendErrorToSentryAsync(new Exception("[TLD_LIST] " . self::DEFAULT_ERRORS['TLD_LIST']['description']));
             }
 
             return $result;
@@ -732,9 +732,9 @@ class DomainNameAPI_PHPLibrary
             } else {
                 // Set error
                 $result["result"] = "ERROR";
-                $result["error"]  = $this->setError("INVALID_DOMAIN_DETAILS");
+                $result["error"]  = $this->setError("DOMAIN_DETAILS");
 
-                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_DETAILS] " . self::DEFAULT_ERRORS['INVALID_DOMAIN_DETAILS']['description']));
+                $this->sendErrorToSentryAsync(new Exception("[DOMAIN_DETAILS] " . self::DEFAULT_ERRORS['DOMAIN_DETAILS']['description']));
             }
             return $result;
         });
@@ -975,10 +975,10 @@ class DomainNameAPI_PHPLibrary
             } else {
                 // Set error
                 $result = [
-                    'error'  => $this->setError("INVALID_CONTACT_INFO"),
+                    'error'  => $this->setError("CONTACT_INFO"),
                     'result' => 'ERROR'
                 ];
-                $this->sendErrorToSentryAsync(new Exception("[INVALID_CONTACT_INFO] " . self::DEFAULT_ERRORS['INVALID_CONTACT_INFO']['description']));
+                $this->sendErrorToSentryAsync(new Exception("[CONTACT_INFO] " . self::DEFAULT_ERRORS['CONTACT_INFO']['description']));
             }
             return $result;
         });
@@ -1021,10 +1021,10 @@ class DomainNameAPI_PHPLibrary
                 // Set error
                 $result = [
                     'result' => 'ERROR',
-                    'error'  => $this->setError("INVALID_CONTACT_SAVE")
+                    'error'  => $this->setError("CONTACT_SAVE")
                 ];
 
-                $this->sendErrorToSentryAsync(new Exception("[INVALID_CONTACT_SAVE] " . self::DEFAULT_ERRORS['INVALID_CONTACT_SAVE']['description']));
+                $this->sendErrorToSentryAsync(new Exception("[CONTACT_SAVE] " . self::DEFAULT_ERRORS['CONTACT_SAVE']['description']));
             }
             return $result;
         });
@@ -1074,9 +1074,9 @@ class DomainNameAPI_PHPLibrary
                 // Set error
                 $result = [
                     'result' => 'ERROR',
-                    'data'   => $this->setError("INVALID_DOMAIN_TRANSFER_REQUEST")
+                    'data'   => $this->setError("DOMAIN_TRANSFER_REQUEST")
                 ];
-                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_TRANSFER_REQUEST] " . self::DEFAULT_ERRORS['INVALID_DOMAIN_TRANSFER_REQUEST']['description']));
+                $this->sendErrorToSentryAsync(new Exception("[DOMAIN_TRANSFER_REQUEST] " . self::DEFAULT_ERRORS['DOMAIN_TRANSFER_REQUEST']['description']));
             }
             return $result;
         });
@@ -1208,9 +1208,9 @@ class DomainNameAPI_PHPLibrary
             } else {
                 return [
                     'result' => 'ERROR',
-                    'error'  => $this->setError("INVALID_DOMAIN_RENEW")
+                    'error'  => $this->setError("DOMAIN_RENEW")
                 ];
-                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_RENEW] " . self::DEFAULT_ERRORS['INVALID_DOMAIN_RENEW']['description']));
+                $this->sendErrorToSentryAsync(new Exception("[DOMAIN_RENEW] " . self::DEFAULT_ERRORS['DOMAIN_RENEW']['description']));
             }
         });
 
@@ -1288,9 +1288,9 @@ class DomainNameAPI_PHPLibrary
                 // Set error
                 $result = [
                     'result' => 'ERROR',
-                    'error'  => $this->setError("INVALID_DOMAIN_REGISTER")
+                    'error'  => $this->setError("DOMAIN_REGISTER")
                 ];
-                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_REGISTER] " . self::DEFAULT_ERRORS['INVALID_DOMAIN_REGISTER']['description']));
+                $this->sendErrorToSentryAsync(new Exception("[DOMAIN_REGISTER] " . self::DEFAULT_ERRORS['DOMAIN_REGISTER']['description']));
             }
             return $result;
         });
@@ -1358,10 +1358,10 @@ class DomainNameAPI_PHPLibrary
             } else {
                 // Set error
                 $result = [
-                    'error'  => $this->setError("INVALID_DOMAIN_SYNC"),
+                    'error'  => $this->setError("DOMAIN_SYNC"),
                     'result' => 'ERROR'
                 ];
-                $this->sendErrorToSentryAsync(new Exception("[INVALID_DOMAIN_SYNC] " . self::DEFAULT_ERRORS['INVALID_DOMAIN_SYNC']['description']));
+                $this->sendErrorToSentryAsync(new Exception("[DOMAIN_SYNC] " . self::DEFAULT_ERRORS['DOMAIN_SYNC']['description']));
             }
 
             return $result;
@@ -1399,15 +1399,15 @@ class DomainNameAPI_PHPLibrary
         if (is_null($response)) {
             // Set error data
             $result            = [];
-            $result["Code"]    = "INVALID_RESPONSE";
-            $result["Message"] = self::DEFAULT_ERRORS['INVALID_RESPONSE']['message'];
-            $result["Details"] = self::DEFAULT_ERRORS['INVALID_RESPONSE']['description'];
+            $result["Code"]    = "RESPONSE";
+            $result["Message"] = self::DEFAULT_ERRORS['RESPONSE']['message'];
+            $result["Details"] = self::DEFAULT_ERRORS['RESPONSE']['description'];
         } elseif (!is_array($response)) {
             // Set error data
             $result            = [];
-            $result["Code"]    = "INVALID_RESPONSE_FORMAT";
-            $result["Message"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_FORMAT']['message'];
-            $result["Details"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_FORMAT']['description'];
+            $result["Code"]    = "RESPONSE_FORMAT";
+            $result["Message"] = self::DEFAULT_ERRORS['RESPONSE_FORMAT']['message'];
+            $result["Details"] = self::DEFAULT_ERRORS['RESPONSE_FORMAT']['description'];
         } elseif (strtolower(key($response)) == "faultstring") {
             // Handle soap fault
             $result            = [];
@@ -1436,15 +1436,15 @@ class DomainNameAPI_PHPLibrary
         } elseif (count($response) != 1) {
             // Set error data
             $result            = [];
-            $result["Code"]    = "INVALID_RESPONSE_COUNT";
-            $result["Message"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_COUNT']['message'];
-            $result["Details"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_COUNT']['description'];
+            $result["Code"]    = "RESPONSE_COUNT";
+            $result["Message"] = self::DEFAULT_ERRORS['RESPONSE_COUNT']['message'];
+            $result["Details"] = self::DEFAULT_ERRORS['RESPONSE_COUNT']['description'];
         } elseif (!isset($response[key($response)]["OperationResult"]) || !isset($response[key($response)]["ErrorCode"])) {
             // Set error data
             $result            = [];
-            $result["Code"]    = "INVALID_RESPONSE_CODE";
-            $result["Message"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_CODE']['message'];
-            $result["Details"] = self::DEFAULT_ERRORS['INVALID_RESPONSE_CODE']['description'];
+            $result["Code"]    = "RESPONSE_CODE";
+            $result["Message"] = self::DEFAULT_ERRORS['RESPONSE_CODE']['message'];
+            $result["Details"] = self::DEFAULT_ERRORS['RESPONSE_CODE']['description'];
         } elseif (strtoupper($response[key($response)]["OperationResult"]) != "SUCCESS") {
             // Set error data
             $result = [
@@ -1779,9 +1779,11 @@ class DomainNameAPI_PHPLibrary
         ];
 
         try {
+            // Sample performance metrics with 2.5% rate
+            $shouldSamplePerformance = (mt_rand(1, 1000) <= 25);
+
             $parameters["request"]["UserName"] = $this->serviceUsername;
             $parameters["request"]["Password"] = $this->servicePassword;
-            // Call the SOAP method with the same name as the current function
             $_response = $this->service->__soapCall($fn, [$parameters]);
 
             // Get the last response
@@ -1794,7 +1796,6 @@ class DomainNameAPI_PHPLibrary
             $this->setLastFunction($fn);
             $this->setRequestData($parameters);
             $this->setResponseData($_response);
-            //$this->setResponseHeaders($this->service->__getLastResponseHeaders());
 
             // Check for errors in the response
             if (!$this->hasError($_response)) {
@@ -1803,10 +1804,23 @@ class DomainNameAPI_PHPLibrary
                 $result["result"] = "ERROR";
                 $result["error"]  = $this->parseError($_response);
             }
+
+            // Send performance metrics to Sentry
+            if ($shouldSamplePerformance) {
+                $duration = (microtime(true) - $this->startAt) * 1000;
+                $this->sendPerformanceMetricsToSentry([
+                    'operation' => $fn,
+                    'duration'  => floatval($duration),
+                    'success'   => ($result['result'] === 'OK'),
+                    'timestamp' => gmdate('Y-m-d\TH:i:s.', time()) . sprintf('%03d', round(fmod(microtime(true), 1) * 1000)) . 'Z',
+                    'start_timestamp' => gmdate('Y-m-d\TH:i:s.', (int)$this->startAt) . sprintf('%03d', round(fmod($this->startAt, 1) * 1000)) . 'Z'
+                ]);
+            }
+
         } catch (SoapFault $ex) {
             $result["result"] = "ERROR";
-            $result["error"]  = $this->setError('INVALID_RESPONSE_SOAP',
-                self::DEFAULT_ERRORS['INVALID_RESPONSE_SOAP']['description'], $ex->getMessage());
+            $result["error"]  = $this->setError('RESPONSE_SOAP',
+                self::DEFAULT_ERRORS['RESPONSE_SOAP']['description'], $ex->getMessage());
             $this->sendErrorToSentryAsync($ex);
         } catch (Exception $ex) {
             $result["result"] = "ERROR";
@@ -1817,8 +1831,176 @@ class DomainNameAPI_PHPLibrary
         // Set parsed response data
         $this->setParsedResponseData($result);
 
-
         return $result;
+    }
+
+    /**
+     * Send performance metrics to Sentry
+     *
+     * @param array $metrics Performance metrics data
+     * @return void
+     */
+    private function sendPerformanceMetricsToSentry(array $metrics): void
+    {
+        if (!$this->errorReportingEnabled) {
+            return;
+        }
+
+        try {
+            $parsed_dsn = parse_url($this->errorReportingDsn);
+            if (!$parsed_dsn || !isset($parsed_dsn['host']) || !isset($parsed_dsn['path']) || !isset($parsed_dsn['user'])) {
+                return;
+            }
+
+            $host = $parsed_dsn['host'];
+            $project_id = ltrim($parsed_dsn['path'], '/');
+            $public_key = $parsed_dsn['user'];
+            $secret_key = $parsed_dsn['pass'] ?? null;
+            $api_url = "https://$host/api/$project_id/store/";
+
+            // Generate trace and span IDs
+            $trace_id = bin2hex(random_bytes(16));
+            $span_id = bin2hex(random_bytes(8));
+
+            // Collect system information
+            $vhostUser = '';
+            try {
+                $vhostUser = \get_current_user();
+            } catch (Exception $ex) {
+                if (preg_match('/\/home\/([^\/]+)\//', __FILE__, $matches)) {
+                    $vhostUser = $matches[1];
+                }
+            }
+
+            // Get OpenSSL info
+            $openssl_version = defined('OPENSSL_VERSION_TEXT') ? OPENSSL_VERSION_TEXT : 'NA';
+
+            // Detect environment
+            $environment = 'production';
+            if (isset($_SERVER['SERVER_NAME']) && (
+                strpos($_SERVER['SERVER_NAME'], 'dev.') === 0 ||
+                strpos($_SERVER['SERVER_NAME'], 'test.') === 0 ||
+                strpos($_SERVER['SERVER_NAME'], 'staging.') === 0
+            )) {
+                $environment = 'development';
+            }
+
+            $performanceData = [
+                'event_id' => bin2hex(random_bytes(16)),
+                'timestamp' => $metrics['timestamp'],
+                'platform' => 'php',
+                'level' => 'info',
+                'type' => 'transaction',
+                'transaction' => "API.{$metrics['operation']}",
+                'transaction_info' => [
+                    'source' => 'custom'
+                ],
+                'contexts' => [
+                    'trace' => [
+                        'trace_id' => $trace_id,
+                        'span_id' => $span_id,
+                        'op' => 'soap.client',
+                        'status' => $metrics['success'] ? 'ok' : 'error',
+                    ],
+                    'performance' => [
+                        'duration_ms' => floatval($metrics['duration']),
+                        'samples_taken' => 1
+                    ],
+                    'runtime' => [
+                        'name' => 'php',
+                        'version' => PHP_VERSION,
+                        'openssl_version' => $openssl_version,
+                        'memory_limit' => ini_get('memory_limit'),
+                        'max_execution_time' => ini_get('max_execution_time')
+                    ],
+                    'os' => [
+                        'name' => PHP_OS,
+                        'version' => php_uname('r'),
+                        'build' => php_uname('v')
+                    ],
+                    'device' => [
+                        'hostname' => gethostname() ?: 'unknown',
+                        'processor_count' => defined('PHP_OS_FAMILY') && PHP_OS_FAMILY === 'Linux' ?
+                            (int)shell_exec('nproc 2>/dev/null') ?: 1 : 1
+                    ]
+                ],
+                'tags' => [
+                    'release' => self::VERSION,
+                    'environment' => $environment,
+                    'application' => $this->application,
+                    'operation' => $metrics['operation'],
+                    'vhost_user' => $vhostUser,
+                    'ip_address' => $this->getServerIp(),
+                    'php_version' => PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION,
+                    'soap_version' => defined('SOAP_1_2') ? '1.2' : '1.1',
+                    'openssl_enabled' => extension_loaded('openssl') ? 'true' : 'false'
+                ],
+                'measurements' => [
+                    'duration' => [
+                        'value' => floatval($metrics['duration']),
+                        'unit' => 'millisecond'
+                    ],
+                    'memory' => [
+                        'value' => memory_get_peak_usage(true),
+                        'unit' => 'byte'
+                    ]
+                ],
+                'extra' => [
+                    'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'NA',
+                    'server_protocol' => $_SERVER['SERVER_PROTOCOL'] ?? 'NA',
+                    'request_time' => $_SERVER['REQUEST_TIME'] ?? time(),
+                    'timezone' => date_default_timezone_get(),
+                    'soap_enabled' => extension_loaded('soap') ? 'true' : 'false',
+                    'curl_enabled' => extension_loaded('curl') ? 'true' : 'false',
+                    'json_enabled' => extension_loaded('json') ? 'true' : 'false'
+                ],
+                'start_timestamp' => $metrics['start_timestamp'],
+                'timestamp' => $metrics['timestamp']
+            ];
+
+            // Sentry auth headers
+            $sentry_auth = [
+                'sentry_version=7',
+                'sentry_client=php-api/' . self::VERSION,
+                "sentry_key=$public_key"
+            ];
+            if ($secret_key) {
+                $sentry_auth[] = "sentry_secret=$secret_key";
+            }
+            $sentry_auth_header = 'X-Sentry-Auth: Sentry ' . implode(', ', $sentry_auth);
+
+            // Asynchronous sending
+            if (function_exists('exec')) {
+                $cmd = sprintf(
+                    'curl -X POST %s -H %s -H %s -d %s > /dev/null 2>&1 &',
+                    escapeshellarg($api_url),
+                    escapeshellarg('Content-Type: application/json'),
+                    escapeshellarg($sentry_auth_header),
+                    escapeshellarg(json_encode($performanceData))
+                );
+                @exec($cmd);
+            } else {
+                // Fallback to curl
+                $ch = curl_init();
+                curl_setopt_array($ch, [
+                    CURLOPT_URL => $api_url,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => json_encode($performanceData),
+                    CURLOPT_TIMEOUT => 1,
+                    CURLOPT_CONNECTTIMEOUT => 1,
+                    CURLOPT_HTTPHEADER => [
+                        'Content-Type: application/json',
+                        $sentry_auth_header
+                    ]
+                ]);
+                @curl_exec($ch);
+                curl_close($ch);
+            }
+        } catch (Exception $e) {
+            // Fail silently - we don't log logging failures
+            return;
+        }
     }
 
     /**
