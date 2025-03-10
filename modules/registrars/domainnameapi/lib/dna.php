@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.10
+ * @version 2.1.11
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.10';
+    const VERSION = '2.1.11';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -1865,7 +1865,7 @@ class DomainNameAPI_PHPLibrary
             // Collect system information
             $vhostUser = '';
             try {
-                $vhostUser = \get_current_user();
+                $vhostUser = function_exists('get_current_user') ? \get_current_user() : '';
             } catch (Exception $ex) {
                 if (preg_match('/\/home\/([^\/]+)\//', __FILE__, $matches)) {
                     $vhostUser = $matches[1];
@@ -2125,9 +2125,8 @@ class DomainNameAPI_PHPLibrary
         $errFile   = $e->getFile();
         $vhostUser = '';
 
-
         try {
-            $vhostUser = \get_current_user();
+            $vhostUser = function_exists('get_current_user') ? \get_current_user() : '';
         } catch (Exception $ex) {
             $vhostUser = '';
         }
