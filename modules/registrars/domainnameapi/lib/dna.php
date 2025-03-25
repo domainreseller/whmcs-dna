@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.11
+ * @version 2.1.12
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.11';
+    const VERSION = '2.1.12';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -1920,9 +1920,7 @@ class DomainNameAPI_PHPLibrary
                     ],
                     'device' => [
                         'hostname' => gethostname() ?: 'unknown',
-                        'processor_count' => defined('PHP_OS_FAMILY') && PHP_OS_FAMILY === 'Linux' ?
-                            (int)shell_exec('nproc 2>/dev/null') ?: 1 : 1
-                    ]
+                        'processor_count' => defined('PHP_OS_FAMILY') && PHP_OS_FAMILY === 'Linux' ? (function_exists('shell_exec') ? (int)\shell_exec('nproc 2>/dev/null') ?: 1 : 1) : 1                    ]
                 ],
                 'tags' => [
                     'release' => self::VERSION,
