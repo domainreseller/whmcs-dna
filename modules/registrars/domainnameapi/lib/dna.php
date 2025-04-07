@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.12
+ * @version 2.1.13
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.12';
+    const VERSION = '2.1.13';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -33,12 +33,13 @@ class DomainNameAPI_PHPLibrary
     ];
 
     const DEFAULT_IGNORED_ERRORS = [
-        '*Domain not found*',
-        '*ERR_DOMAIN_NOT_FOUND*',
-        '*Reseller not found*',
-        '*Domain is not in updateable status. It must be active*',
-        '*balance is not sufficient*',
-        '*Price definition not found*',
+        'Domain not found',
+        'ERR_DOMAIN_NOT_FOUND',
+        'Reseller not found',
+        'Domain is not in updateable status',
+        'balance is not sufficient',
+        'Price definition not found',
+        'TLD is not supported',
     ];
 
     const DEFAULT_ERRORS = [
@@ -1262,6 +1263,41 @@ class DomainNameAPI_PHPLibrary
                 "RegistrantContact"       => $this->validateContact($contacts["Registrant"])
             ]
         ];
+
+        if(substr($domainName, -3) == ".tr") {
+
+            if(!isset($addionalAttributes['TRABISDOMAINCATEGORY'])) {
+                $addionalAttributes['TRABISDOMAINCATEGORY'] = '1';
+            }
+
+            if(!isset($addionalAttributes['TRABISCOUNTRYID'])) {
+                $addionalAttributes['TRABISCOUNTRYID'] = 215;
+                $addionalAttributes['TRABISCOUNTRYNAME'] = 'TR';
+                $addionalAttributes['TRABISCITYNAME'] = 'Istanbul';
+                $addionalAttributes['TRABISCITIYID'] = 34;
+            }
+
+            if ($addionalAttributes['TRABISDOMAINCATEGORY'] == '1') {
+                if (!isset($addionalAttributes['TRABISNAMESURNAME'])) {
+                    $addionalAttributes['TRABISNAMESURNAME'] = $parameters["request"]["RegistrantContact"]['FirstName'] . ' ' . $parameters["request"]["RegistrantContact"]['LastName'];
+                }
+                if (!isset($addionalAttributes['TRABISCITIZIENID'])) {
+                    $addionalAttributes['TRABISCITIZIENID'] = '11111111111';
+                }
+                unset($addionalAttributes['TRABISORGANIZATION'],$addionalAttributes['TRABISTAXOFFICE'],$addionalAttributes['TRABISTAXNUMBER']);
+            }else{
+                if (!isset($addionalAttributes['TRABISORGANIZATION'])) {
+                    $addionalAttributes['TRABISORGANIZATION'] = $parameters["request"]["RegistrantContact"]['Company'];
+                }
+                if (!isset($addionalAttributes['TRABISTAXOFFICE'])) {
+                    $addionalAttributes['TRABISTAXOFFICE'] = 'Istanbul';
+                }
+                if (!isset($addionalAttributes['TRABISTAXNUMBER'])) {
+                    $addionalAttributes['TRABISTAXNUMBER'] = '1111111111';
+                }
+                unset($addionalAttributes['TRABISNAMESURNAME'],$addionalAttributes['TRABISCITIZIENID']);
+            }
+        }
 
         if (count($addionalAttributes) > 0) {
             foreach ($addionalAttributes as $k => $v) {
