@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.13
+ * @version 2.1.14
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.13';
+    const VERSION = '2.1.14';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -154,8 +154,8 @@ class DomainNameAPI_PHPLibrary
             'dsn'  => ''
         ],
         'HOSTFACT'       => [
-            'path' => '',
-            'dsn'  => ''
+            'path' => 'Pro/3rdparty/domain/domainnameapi',
+            'dsn'  => 'https://58fe0a01a6704d9f1c2dbbc1a316f233@sentry.atakdomain.com/14'
         ],
         'NONE'           => [
             'path' => '',
