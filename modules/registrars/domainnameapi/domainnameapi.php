@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.2.7
+ * @version 2.2.8
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
@@ -20,7 +20,7 @@ new DomainNameApi\Services\Language();
 
 function domainnameapi_version(): string
 {
-    return '2.2.7';
+    return '2.2.8';
 }
 
 function domainnameapi_getConfigArray($params) {
@@ -862,6 +862,10 @@ function domainnameapi_GetTldPricing($params) {
 
 
                 $tlds[] = $extension['tld'];
+                
+                if($extension['pricing']['registration'][1]*1.1 <$extension['pricing']['registration'][2]/2){
+                    $extension['maxperiod'] =1;
+                }
 
                 $item      = (new ImportItem)->setExtension(trim($extension['tld']))
                                              ->setMinYears($extension['minperiod'])
