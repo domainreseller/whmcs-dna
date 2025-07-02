@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.14
+ * @version 2.1.15
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.14';
+    const VERSION = '2.1.15';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -206,6 +206,7 @@ class DomainNameAPI_PHPLibrary
      * @var string $serviceUrl
      */
     private string     $serviceUrl          = "https://whmcs.domainnameapi.com/DomainApi.svc";
+    private string     $serviceTestUrl      = "https://ote-api.domainnameapi.com/DomainApi.svc";
     private string     $application         = "CORE";
     public array       $lastRequest         = [];
     public array       $lastResponse        = [];
@@ -223,9 +224,10 @@ class DomainNameAPI_PHPLibrary
      * @param bool $testMode
      * @throws Exception | SoapFault
      */
-    public function __construct($userName = "ownername", $password = "ownerpass")
+    public function __construct($userName = "ownername", $password = "ownerpass",$testmode=false)
     {
         $this->startAt = microtime(true);
+        self::useTestMode($testmode);
         self::setCredentials($userName, $password);
         self::setApplication();
 
@@ -277,10 +279,9 @@ class DomainNameAPI_PHPLibrary
      */
     private function useTestMode($value = true)
     {
-        //if ($value === true || $value == 'on') {
-        //    $this->serviceUsername = 'test1.dna@apiname.com';
-        //    $this->servicePassword = 'FsUvpJMzQ69scpqE';
-        //}
+        if ($value === true || $value == 'on') {
+            $this->serviceUrl = $this->serviceTestUrl;
+        }
     }
 
 
