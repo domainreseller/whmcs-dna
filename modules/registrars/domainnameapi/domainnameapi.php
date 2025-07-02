@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.2.7
+ * @version 2.2.9
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
@@ -20,7 +20,7 @@ new DomainNameApi\Services\Language();
 
 function domainnameapi_version(): string
 {
-    return '2.2.7';
+    return '2.2.9';
 }
 
 function domainnameapi_getConfigArray($params) {
@@ -42,7 +42,7 @@ function domainnameapi_getConfigArray($params) {
 
     if (class_exists("SoapClient")) {
 
-        $sysMsg ='';
+        $sysMsg =$addionalMessage='';
 
         if(strlen($params['API_UserName'])<1 ||  strlen($params['API_Password'])<1) {
             $sysMsg = 'Please enter your username and password';
@@ -54,6 +54,7 @@ function domainnameapi_getConfigArray($params) {
             $testmode = $params["API_TestMode"];
 
 
+            $addionalMessage = "Don't have an Domain Name API account yet? Get one here: <a href='https://www.domainnameapi.com/become-a-reseller' target='_blank'>https://www.domainnameapi.com/become-a-reseller</a>";
             $sysMsg = domainnameapi_parse_cache('user_'.$username.md5($password).$testmode, 100, function () use ($dna) {
 
                 $details = $dna->GetResellerDetails();
@@ -61,7 +62,7 @@ function domainnameapi_getConfigArray($params) {
                 $sysMsg='';
 
                 if ($details['result'] != 'OK') {
-                     $sysMsg = "Username and password combination not correct";
+                     $sysMsg = "<b>Username and password combination not correct</b>";
                 } else {
                     $balances = [];
                      $sysMsg = "User: <b>{$details['name']}({$details['id']})</b> , Balance: ";
@@ -69,12 +70,19 @@ function domainnameapi_getConfigArray($params) {
                         $balances[]= "<b>{$v['balance']}{$v['symbol']}</b>";
                      }
                     $sysMsg .= implode(' | ', $balances);
+                    $addionalMessage='';
 
                 }
-
                 return $sysMsg;
-
             });
+
+            if(strpos($sysMsg,'User' ) !== false){
+                $addionalMessage='';
+            }
+            
+            if($testmode ===true || $testmode == 'on' || $testmode == 'yes') {
+                $addionalMessage = "-- You are using the test platform. --";
+            }
 
         }
 
@@ -85,7 +93,7 @@ function domainnameapi_getConfigArray($params) {
             ],
             "Description"  => [
                 "Type"  => "System",
-                "Value" => $sysMsg ."<br>Don't have an Domain Name API account yet? Get one here: <a href='https://www.domainnameapi.com/become-a-reseller' target='_blank'>https://www.domainnameapi.com/become-a-reseller</a>"
+                "Value" =>  "{$sysMsg}<br>{$addionalMessage}",
             ],
             "API_UserName" => [
                 "FriendlyName" => "UserName",
@@ -862,6 +870,10 @@ function domainnameapi_GetTldPricing($params) {
 
 
                 $tlds[] = $extension['tld'];
+                
+                if($extension['pricing']['registration'][1]*1.1 <$extension['pricing']['registration'][2]/2){
+                    $extension['maxperiod'] =1;
+                }
 
                 $item      = (new ImportItem)->setExtension(trim($extension['tld']))
                                              ->setMinYears($extension['minperiod'])
@@ -1194,7 +1206,7 @@ function getDNAApi($params){
     $password = $params["API_Password"];
     $testmode = $params["API_TestMode"];
 
-    return new \DomainNameApi\DomainNameAPI_PHPLibrary($username,$password);
+    return new \DomainNameApi\DomainNameAPI_PHPLibrary($username,$password,$testmode);
 }
 
 function domainnameapi_parse_contact($params) {
