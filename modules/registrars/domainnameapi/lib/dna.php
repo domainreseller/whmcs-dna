@@ -3,7 +3,7 @@
  * Created by PhpStorm.
  * User: bunyaminakcay
  * Project name whmcs-dna
- * 20.11.2022 00:13
+ * 20.11.2022
  * Bünyamin AKÇAY <bunyamin@bunyam.in>
  */
 
