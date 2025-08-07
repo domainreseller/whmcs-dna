@@ -2,7 +2,7 @@
 /**
  * Created by PhpStorm.
  * User: bunyaminakcay
- * Project name whmcs-dna
+ * Project name php-dna
  * 20.11.2022
  * Bünyamin AKÇAY <bunyamin@bunyam.in>
  */
@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.15
+ * @version 2.1.17
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.15';
+    const VERSION = '2.1.17';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -156,6 +156,10 @@ class DomainNameAPI_PHPLibrary
         'HOSTFACT'       => [
             'path' => 'Pro/3rdparty/domain/domainnameapi',
             'dsn'  => 'https://58fe0a01a6704d9f1c2dbbc1a316f233@sentry.atakdomain.com/14'
+        ],
+        'FOSSBILLING'       => [
+            'path' => 'library/Registrar/Adapter/DomainNameApi',
+            'dsn'  => 'https://3a129526bcd91cc309de8358d87846b9@sentry.atakdomain.com/15'
         ],
         'NONE'           => [
             'path' => '',
@@ -1405,6 +1409,23 @@ class DomainNameAPI_PHPLibrary
         });
     }
 
+    public function CheckTransfer($domainName,$authcode)
+    {
+        $parameters = [
+            "request" => [
+                "DomainName" => $domainName,
+                "AuthCode"   => $authcode
+            ]
+        ];
+
+        return self::parseCall(__FUNCTION__, $parameters, function ($response) use ($parameters) {
+            $data = $response[key($response)];
+            return [
+                'result' => $data['OperationResult'] == 'SUCCESS' ? 'OK' : 'ERROR'
+            ];
+        });
+    }
+
     /**
      * Convert object to array
      *
@@ -1492,7 +1513,7 @@ class DomainNameAPI_PHPLibrary
 
             if (isset($response[key($response)]["OperationMessage"])) {
                 $result["Code"]     = "API_" . $response[key($response)]["ErrorCode"];
-                $result['Response'] = print_r($response, true);
+                //$result['Response'] = print_r($response, true);
             }
 
             if (isset($response[key($response)]["OperationResult"])) {
@@ -1856,8 +1877,7 @@ class DomainNameAPI_PHPLibrary
 
         } catch (SoapFault $ex) {
             $result["result"] = "ERROR";
-            $result["error"]  = $this->setError('RESPONSE_SOAP',
-                self::DEFAULT_ERRORS['RESPONSE_SOAP']['description'], $ex->getMessage());
+            $result["error"]  = $this->setError('RESPONSE_SOAP', self::DEFAULT_ERRORS['RESPONSE_SOAP']['description'], $ex->getMessage());
             $this->sendErrorToSentryAsync($ex);
         } catch (Exception $ex) {
             $result["result"] = "ERROR";
