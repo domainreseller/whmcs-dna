@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.17
+ * @version 2.1.18
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.17';
+    const VERSION = '2.1.18';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -123,6 +123,7 @@ class DomainNameAPI_PHPLibrary
     const DEFAULT_CACHE_TTL = 512;
     const DEFAULT_TIMEOUT   = 20;
     const DEFAULT_REASON    = 'Owner request';
+    const PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
 
     private const APPLICATIONS = [
         'WHMCS'          => [
@@ -434,12 +435,34 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
+     * Magic method to support both PascalCase and camelCase method calls
+     * Converts PascalCase to camelCase and calls the method
+     *
+     * @param string $name Method name
+     * @param array $arguments Method arguments
+     * @return mixed
+     * @throws Exception
+     */
+    public function __call($name, $arguments)
+    {
+        // Convert PascalCase to camelCase
+        $camelCaseName = lcfirst($name);
+
+        // Check if camelCase method exists
+        if (method_exists($this, $camelCaseName)) {
+            return call_user_func_array([$this, $camelCaseName], $arguments);
+        }
+
+        throw new Exception("Method {$name} does not exist");
+    }
+
+    /**
      * Get Current account details with balance
      *
      * @return array Account details and balance information
      * @see examples/GetResellerDetails.php
      */
-    public function GetResellerDetails()
+    public function getResellerDetails()
     {
         $parameters = [
             "request" => [
@@ -478,7 +501,7 @@ class DomainNameAPI_PHPLibrary
                 $resp['balances'] = $balances;
             } else {
                 $resp['result'] = 'ERROR';
-                $resp['error']  = $this->setError("CREDINENTIALS");
+                $resp['error']  = $this->setError("CREDENTIALS");
             }
 
 
@@ -496,7 +519,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Balance information for specified currency
      * @see examples/GetCurrentBalance.php
      */
-    public function GetCurrentBalance($currencyId = 'USD')
+    public function getCurrentBalance($currencyId = 'USD')
     {
         $currencyId = strtoupper($currencyId);
 
@@ -536,18 +559,18 @@ class DomainNameAPI_PHPLibrary
      * @param array $domains Domain names to check
      * @param array $extensions Extensions to check
      * @param int $period Registration period in years
-     * @param string $Command Operation type (create, renew, transfer etc.)
+     * @param string $command Operation type (create, renew, transfer etc.)
      * @return array Domain availability status and pricing information
      * @see examples/CheckAvailability.php
      */
-    public function CheckAvailability($domains, $extensions, $period, $Command)
+    public function checkAvailability($domains, $extensions, $period, $command)
     {
         $parameters = [
             "request" => [
                 "DomainNameList" => $domains,
                 "TldList"        => $extensions,
                 "Period"         => $period,
-                "Commad"         => $Command
+                "Command"        => $command
             ]
         ];
 
@@ -599,7 +622,7 @@ class DomainNameAPI_PHPLibrary
      * @return array List of domains with their details
      * @see examples/GetList.php
      */
-    public function GetList($extra_parameters = [])
+    public function getList($extra_parameters = [])
     {
         $parameters = [
             "request" => []
@@ -651,7 +674,7 @@ class DomainNameAPI_PHPLibrary
      * @return array List of TLDs with pricing information
      * @see examples/GetTldList.php
      */
-    public function GetTldList($count = 20)
+    public function getTldList($count = 20)
     {
         $parameters = [
             "request" => [
@@ -718,7 +741,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Detailed domain information
      * @see examples/GetDetails.php
      */
-    public function GetDetails($domainName)
+    public function getDetails($domainName)
     {
         $parameters = [
             "request" => [
@@ -757,7 +780,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/ModifyNameServer.php
      */
-    public function ModifyNameServer($domainName, $nameServers)
+    public function modifyNameServer($domainName, $nameServers)
     {
         $parameters = [
             "request" => [
@@ -789,7 +812,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/EnableTheftProtectionLock.php
      */
-    public function EnableTheftProtectionLock($domainName)
+    public function enableTheftProtectionLock($domainName)
     {
         $parameters = [
             "request" => [
@@ -818,7 +841,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/DisableTheftProtectionLock.php
      */
-    public function DisableTheftProtectionLock($domainName)
+    public function disableTheftProtectionLock($domainName)
     {
         $parameters = [
             "request" => [
@@ -850,7 +873,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/AddChildNameServer.php
      */
-    public function AddChildNameServer($domainName, $nameServer, $ipAddress)
+    public function addChildNameServer($domainName, $nameServer, $ipAddress)
     {
         $parameters = [
             "request" => [
@@ -883,7 +906,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/DeleteChildNameServer.php
      */
-    public function DeleteChildNameServer($domainName, $nameServer)
+    public function deleteChildNameServer($domainName, $nameServer)
     {
         $parameters = [
             "request" => [
@@ -915,7 +938,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/ModifyChildNameServer.php
      */
-    public function ModifyChildNameServer($domainName, $nameServer, $ipAddress)
+    public function modifyChildNameServer($domainName, $nameServer, $ipAddress)
     {
         $parameters = [
             "request" => [
@@ -949,7 +972,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Contact information for all contact types
      * @see examples/GetContacts.php
      */
-    public function GetContacts($domainName)
+    public function getContacts($domainName)
     {
         $parameters = [
             "request" => [
@@ -1001,7 +1024,7 @@ class DomainNameAPI_PHPLibrary
      * @param array $contacts
      * @return array
      */
-    public function SaveContacts($domainName, $contacts)
+    public function saveContacts($domainName, $contacts)
     {
         $parameters = [
             "request" => [
@@ -1048,7 +1071,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Transfer status and domain information
      * @see examples/Transfer.php
      */
-    public function Transfer($domainName, $eppCode, $period)
+    public function transfer($domainName, $eppCode, $period)
     {
         $parameters = [
             "request" => [
@@ -1099,7 +1122,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/CancelTransfer.php
      */
-    public function CancelTransfer($domainName)
+    public function cancelTransfer($domainName)
     {
         $parameters = [
             "request" => [
@@ -1130,7 +1153,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/ApproveTransfer.php
      */
-    public function ApproveTransfer($domainName)
+    public function approveTransfer($domainName)
     {
         $parameters = [
             "request" => [
@@ -1160,7 +1183,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/RejectTransfer.php
      */
-    public function RejectTransfer($domainName)
+    public function rejectTransfer($domainName)
     {
         $parameters = [
             "request" => [
@@ -1192,7 +1215,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Renewal status and expiration date
      * @see examples/Renew.php
      */
-    public function Renew($domainName, $period)
+    public function renew($domainName, $period)
     {
         $parameters = [
             "request" => [
@@ -1237,7 +1260,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Registration status and domain information
      * @see examples/RegisterWithContactInfo.php
      */
-    public function RegisterWithContactInfo(
+    public function registerWithContactInfo(
         $domainName,
         $period,
         $contacts,
@@ -1350,7 +1373,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/ModifyPrivacyProtectionStatus.php
      */
-    public function ModifyPrivacyProtectionStatus($domainName, $status, $reason = self::DEFAULT_REASON)
+    public function modifyPrivacyProtectionStatus($domainName, $status, $reason = self::DEFAULT_REASON)
     {
         $parameters = [
             "request" => [
@@ -1378,7 +1401,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Updated domain information
      * @see examples/SyncFromRegistry.php
      */
-    public function SyncFromRegistry($domainName)
+    public function syncFromRegistry($domainName)
     {
         $parameters = [
             "request" => [
@@ -1409,7 +1432,7 @@ class DomainNameAPI_PHPLibrary
         });
     }
 
-    public function CheckTransfer($domainName,$authcode)
+    public function checkTransfer($domainName,$authcode)
     {
         $parameters = [
             "request" => [
@@ -1709,7 +1732,7 @@ class DomainNameAPI_PHPLibrary
 
                     if (is_array($attrValue)) {
                         foreach ($attrValue as $nameserverValue) {
-                            $result["NameServers"] = $nameserverValue;
+                            $result["NameServers"][] = $nameserverValue;
                         }
                     }
                     break;
@@ -1747,11 +1770,11 @@ class DomainNameAPI_PHPLibrary
                                         if (is_array($attribute["IpAddress"]["string"])) {
                                             foreach ($attribute["IpAddress"]["string"] as $ip) {
                                                 if (isset($ip) && is_string($ip)) {
-                                                    $IpAddresses = $ip;
+                                                    $IpAddresses[] = $ip;
                                                 }
                                             }
                                         } elseif (is_string($attribute["IpAddress"]["string"])) {
-                                            $IpAddresses = $attribute["IpAddress"]["string"];
+                                            $IpAddresses[] = $attribute["IpAddress"]["string"];
                                         }
                                     }
 
@@ -1838,7 +1861,7 @@ class DomainNameAPI_PHPLibrary
 
         try {
             // Sample performance metrics with 2.5% rate
-            $shouldSamplePerformance = (mt_rand(1, 1000) <= 25);
+            $shouldSamplePerformance = (mt_rand(1, 1000) <= self::PERFORMANCE_SAMPLE_RATE);
 
             $parameters["request"]["UserName"] = $this->serviceUsername;
             $parameters["request"]["Password"] = $this->servicePassword;
@@ -2316,7 +2339,7 @@ class DomainNameAPI_PHPLibrary
         // IP adresini alma ve cacheleme
         try {
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, "http://ipecho.net/plain");
+            curl_setopt($ch, CURLOPT_URL, "https://ipecho.net/plain");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             curl_setopt($ch, CURLOPT_TIMEOUT, 2);
             $external_ip = curl_exec($ch);
