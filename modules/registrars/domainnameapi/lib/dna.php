@@ -1736,7 +1736,7 @@ class DomainNameAPI_PHPLibrary
 
                     if (is_array($attrValue)) {
                         foreach ($attrValue as $nameserverValue) {
-                            $result["NameServers"][] = $nameserverValue;
+                            $result["NameServers"] = $nameserverValue;
                         }
                     }
                     break;
@@ -1774,11 +1774,11 @@ class DomainNameAPI_PHPLibrary
                                         if (is_array($attribute["IpAddress"]["string"])) {
                                             foreach ($attribute["IpAddress"]["string"] as $ip) {
                                                 if (isset($ip) && is_string($ip)) {
-                                                    $IpAddresses[] = $ip;
+                                                    $IpAddresses = $ip;
                                                 }
                                             }
                                         } elseif (is_string($attribute["IpAddress"]["string"])) {
-                                            $IpAddresses[] = $attribute["IpAddress"]["string"];
+                                            $IpAddresses = $attribute["IpAddress"]["string"];
                                         }
                                     }
 
