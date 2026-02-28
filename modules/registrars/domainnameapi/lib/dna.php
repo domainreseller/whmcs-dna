@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.17
+ * @version 2.1.20
  */
 
 
@@ -25,7 +25,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.17';
+    const VERSION = '2.1.20';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -123,6 +123,11 @@ class DomainNameAPI_PHPLibrary
     const DEFAULT_CACHE_TTL = 512;
     const DEFAULT_TIMEOUT   = 20;
     const DEFAULT_REASON    = 'Owner request';
+    const PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
+
+    const RESULT_OK      = 'OK';
+    const RESULT_ERROR   = 'ERROR';
+    const RESULT_SUCCESS = 'SUCCESS';
 
     private const APPLICATIONS = [
         'WHMCS'          => [
@@ -434,12 +439,34 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
+     * Magic method to support both PascalCase and camelCase method calls
+     * Converts PascalCase to camelCase and calls the method
+     *
+     * @param string $name Method name
+     * @param array $arguments Method arguments
+     * @return mixed
+     * @throws Exception
+     */
+    public function __call($name, $arguments)
+    {
+        // Convert PascalCase to camelCase
+        $camelCaseName = lcfirst($name);
+
+        // Check if camelCase method exists
+        if (method_exists($this, $camelCaseName)) {
+            return call_user_func_array([$this, $camelCaseName], $arguments);
+        }
+
+        throw new Exception("Method {$name} does not exist");
+    }
+
+    /**
      * Get Current account details with balance
      *
      * @return array Account details and balance information
      * @see examples/GetResellerDetails.php
      */
-    public function GetResellerDetails()
+    public function getResellerDetails()
     {
         $parameters = [
             "request" => [
@@ -453,7 +480,7 @@ class DomainNameAPI_PHPLibrary
             $resp = [];
 
             if (isset($data['ResellerInfo'])) {
-                $resp['result'] = 'OK';
+                $resp['result'] = self::RESULT_OK;
                 $resp['id']     = $data['ResellerInfo']['Id'];
                 $resp['active'] = $data['ResellerInfo']['Status'] == 'Active';
                 $resp['name']   = $data['ResellerInfo']['Name'];
@@ -477,8 +504,8 @@ class DomainNameAPI_PHPLibrary
                 $resp['symbol']   = $active_currency['CurrencySymbol'];
                 $resp['balances'] = $balances;
             } else {
-                $resp['result'] = 'ERROR';
-                $resp['error']  = $this->setError("CREDINENTIALS");
+                $resp['result'] = self::RESULT_ERROR;
+                $resp['error']  = $this->setError("CREDENTIALS");
             }
 
 
@@ -496,7 +523,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Balance information for specified currency
      * @see examples/GetCurrentBalance.php
      */
-    public function GetCurrentBalance($currencyId = 'USD')
+    public function getCurrentBalance($currencyId = 'USD')
     {
         $currencyId = strtoupper($currencyId);
 
@@ -536,18 +563,18 @@ class DomainNameAPI_PHPLibrary
      * @param array $domains Domain names to check
      * @param array $extensions Extensions to check
      * @param int $period Registration period in years
-     * @param string $Command Operation type (create, renew, transfer etc.)
+     * @param string $command Operation type (create, renew, transfer etc.)
      * @return array Domain availability status and pricing information
      * @see examples/CheckAvailability.php
      */
-    public function CheckAvailability($domains, $extensions, $period, $Command)
+    public function checkAvailability($domains, $extensions, $period, $command)
     {
         $parameters = [
             "request" => [
                 "DomainNameList" => $domains,
                 "TldList"        => $extensions,
                 "Period"         => $period,
-                "Commad"         => $Command
+                "Commad"        => $command
             ]
         ];
 
@@ -599,7 +626,7 @@ class DomainNameAPI_PHPLibrary
      * @return array List of domains with their details
      * @see examples/GetList.php
      */
-    public function GetList($extra_parameters = [])
+    public function getList($extra_parameters = [])
     {
         $parameters = [
             "request" => []
@@ -626,11 +653,11 @@ class DomainNameAPI_PHPLibrary
                     }
                 }
 
-                $result["result"]     = "OK";
+                $result["result"]     = self::RESULT_OK;
                 $result["TotalCount"] = $data["TotalCount"];
             } else {
                 // Set error
-                $result["result"] = "ERROR";
+                $result["result"] = self::RESULT_ERROR;
                 $result["error"]  = $this->setError("DOMAIN_LIST");
 
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_LIST] " . self::DEFAULT_ERRORS['DOMAIN_LIST']['description']));
@@ -651,7 +678,7 @@ class DomainNameAPI_PHPLibrary
      * @return array List of TLDs with pricing information
      * @see examples/GetTldList.php
      */
-    public function GetTldList($count = 20)
+    public function getTldList($count = 20)
     {
         $parameters = [
             "request" => [
@@ -693,12 +720,12 @@ class DomainNameAPI_PHPLibrary
 
                 $result = [
                     'data'   => $extensions,
-                    'result' => 'OK'
+                    'result' => self::RESULT_OK
                 ];
             } else {
                 // Set error
                 $result = [
-                    'result' => 'ERROR',
+                    'result' => self::RESULT_ERROR,
                     'error'  => $this->setError("TLD_LIST")
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[TLD_LIST] " . self::DEFAULT_ERRORS['TLD_LIST']['description']));
@@ -718,7 +745,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Detailed domain information
      * @see examples/GetDetails.php
      */
-    public function GetDetails($domainName)
+    public function getDetails($domainName)
     {
         $parameters = [
             "request" => [
@@ -734,10 +761,10 @@ class DomainNameAPI_PHPLibrary
                 // Parse domain info
 
                 $result["data"]   = $this->parseDomainInfo($data["DomainInfo"]);
-                $result["result"] = "OK";
+                $result["result"] = self::RESULT_OK;
             } else {
                 // Set error
-                $result["result"] = "ERROR";
+                $result["result"] = self::RESULT_ERROR;
                 $result["error"]  = $this->setError("DOMAIN_DETAILS");
 
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_DETAILS] " . self::DEFAULT_ERRORS['DOMAIN_DETAILS']['description']));
@@ -757,7 +784,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/ModifyNameServer.php
      */
-    public function ModifyNameServer($domainName, $nameServers)
+    public function modifyNameServer($domainName, $nameServers)
     {
         $parameters = [
             "request" => [
@@ -772,7 +799,7 @@ class DomainNameAPI_PHPLibrary
 
             $result["data"]                = [];
             $result["data"]["NameServers"] = $parameters["request"]["NameServerList"];
-            $result["result"]              = "OK";
+            $result["result"]              = self::RESULT_OK;
 
             return $result;
         });
@@ -789,7 +816,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/EnableTheftProtectionLock.php
      */
-    public function EnableTheftProtectionLock($domainName)
+    public function enableTheftProtectionLock($domainName)
     {
         $parameters = [
             "request" => [
@@ -802,7 +829,7 @@ class DomainNameAPI_PHPLibrary
                 'data'   => [
                     'LockStatus' => true
                 ],
-                'result' => 'OK'
+                'result' => self::RESULT_OK
             ];
         });
 
@@ -818,7 +845,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/DisableTheftProtectionLock.php
      */
-    public function DisableTheftProtectionLock($domainName)
+    public function disableTheftProtectionLock($domainName)
     {
         $parameters = [
             "request" => [
@@ -832,7 +859,7 @@ class DomainNameAPI_PHPLibrary
                 'data'   => [
                     'LockStatus' => false
                 ],
-                'result' => 'OK'
+                'result' => self::RESULT_OK
             ];
         });
 
@@ -850,7 +877,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/AddChildNameServer.php
      */
-    public function AddChildNameServer($domainName, $nameServer, $ipAddress)
+    public function addChildNameServer($domainName, $nameServer, $ipAddress)
     {
         $parameters = [
             "request" => [
@@ -867,7 +894,7 @@ class DomainNameAPI_PHPLibrary
                     'NameServer' => $parameters["request"]["ChildNameServer"],
                     'IPAdresses' => $parameters["request"]["IpAddressList"]
                 ],
-                'result' => 'OK'
+                'result' => self::RESULT_OK
             ];
         });
 
@@ -883,7 +910,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/DeleteChildNameServer.php
      */
-    public function DeleteChildNameServer($domainName, $nameServer)
+    public function deleteChildNameServer($domainName, $nameServer)
     {
         $parameters = [
             "request" => [
@@ -898,7 +925,7 @@ class DomainNameAPI_PHPLibrary
                 'data'   => [
                     'NameServer' => $parameters["request"]["ChildNameServer"],
                 ],
-                'result' => 'OK'
+                'result' => self::RESULT_OK
             ];
         });
 
@@ -915,7 +942,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/ModifyChildNameServer.php
      */
-    public function ModifyChildNameServer($domainName, $nameServer, $ipAddress)
+    public function modifyChildNameServer($domainName, $nameServer, $ipAddress)
     {
         $parameters = [
             "request" => [
@@ -932,7 +959,7 @@ class DomainNameAPI_PHPLibrary
                     'NameServer' => $parameters["request"]["ChildNameServer"],
                     'IPAdresses' => $parameters["request"]["IpAddressList"]
                 ],
-                'result' => 'OK'
+                'result' => self::RESULT_OK
             ];
         });
 
@@ -949,7 +976,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Contact information for all contact types
      * @see examples/GetContacts.php
      */
-    public function GetContacts($domainName)
+    public function getContacts($domainName)
     {
         $parameters = [
             "request" => [
@@ -976,13 +1003,13 @@ class DomainNameAPI_PHPLibrary
                             'Technical'      => $this->parseContactInfo($data["TechnicalContact"]),
                         ]
                     ],
-                    'result' => 'OK'
+                    'result' => self::RESULT_OK
                 ];
             } else {
                 // Set error
                 $result = [
                     'error'  => $this->setError("CONTACT_INFO"),
-                    'result' => 'ERROR'
+                    'result' => self::RESULT_ERROR
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[CONTACT_INFO] " . self::DEFAULT_ERRORS['CONTACT_INFO']['description']));
             }
@@ -1001,7 +1028,7 @@ class DomainNameAPI_PHPLibrary
      * @param array $contacts
      * @return array
      */
-    public function SaveContacts($domainName, $contacts)
+    public function saveContacts($domainName, $contacts)
     {
         $parameters = [
             "request" => [
@@ -1019,14 +1046,14 @@ class DomainNameAPI_PHPLibrary
 
             $result = [];
 
-            if ($data['OperationResult'] == 'SUCCESS') {
+            if ($data['OperationResult'] == self::RESULT_SUCCESS) {
                 $result = [
-                    'result' => 'OK'
+                    'result' => self::RESULT_OK
                 ];
             } else {
                 // Set error
                 $result = [
-                    'result' => 'ERROR',
+                    'result' => self::RESULT_ERROR,
                     'error'  => $this->setError("CONTACT_SAVE")
                 ];
 
@@ -1048,7 +1075,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Transfer status and domain information
      * @see examples/Transfer.php
      */
-    public function Transfer($domainName, $eppCode, $period)
+    public function transfer($domainName, $eppCode, $period)
     {
         $parameters = [
             "request" => [
@@ -1073,13 +1100,13 @@ class DomainNameAPI_PHPLibrary
             if (isset($data["DomainInfo"]) && is_array($data["DomainInfo"])) {
                 // Parse domain info
                 $result = [
-                    'result' => 'OK',
+                    'result' => self::RESULT_OK,
                     'data'   => $this->parseDomainInfo($data["DomainInfo"])
                 ];
             } else {
                 // Set error
                 $result = [
-                    'result' => 'ERROR',
+                    'result' => self::RESULT_ERROR,
                     'data'   => $this->setError("DOMAIN_TRANSFER_REQUEST")
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_TRANSFER_REQUEST] " . self::DEFAULT_ERRORS['DOMAIN_TRANSFER_REQUEST']['description']));
@@ -1099,7 +1126,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/CancelTransfer.php
      */
-    public function CancelTransfer($domainName)
+    public function cancelTransfer($domainName)
     {
         $parameters = [
             "request" => [
@@ -1112,7 +1139,7 @@ class DomainNameAPI_PHPLibrary
             $data = $response[key($response)];
 
             return [
-                'result' => $data['OperationResult'] == 'SUCCESS' ? 'OK' : 'ERROR',
+                'result' => $data['OperationResult'] == self::RESULT_SUCCESS ? self::RESULT_OK : self::RESULT_ERROR,
                 'data'   => [
                     'DomainName' => $parameters["request"]["DomainName"]
                 ]
@@ -1130,7 +1157,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/ApproveTransfer.php
      */
-    public function ApproveTransfer($domainName)
+    public function approveTransfer($domainName)
     {
         $parameters = [
             "request" => [
@@ -1143,7 +1170,7 @@ class DomainNameAPI_PHPLibrary
             $data = $response[key($response)];
 
             return [
-                'result' => $data['OperationResult'] == 'SUCCESS' ? 'OK' : 'ERROR',
+                'result' => $data['OperationResult'] == self::RESULT_SUCCESS ? self::RESULT_OK : self::RESULT_ERROR,
                 'data'   => [
                     'DomainName' => $parameters["request"]["DomainName"]
                 ]
@@ -1160,7 +1187,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/RejectTransfer.php
      */
-    public function RejectTransfer($domainName)
+    public function rejectTransfer($domainName)
     {
         $parameters = [
             "request" => [
@@ -1173,7 +1200,7 @@ class DomainNameAPI_PHPLibrary
             $data = $response[key($response)];
 
             return [
-                'result' => $data['OperationResult'] == 'SUCCESS' ? 'OK' : 'ERROR',
+                'result' => $data['OperationResult'] == self::RESULT_SUCCESS ? self::RESULT_OK : self::RESULT_ERROR,
                 'data'   => [
                     'DomainName' => $parameters["request"]["DomainName"]
                 ]
@@ -1192,7 +1219,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Renewal status and expiration date
      * @see examples/Renew.php
      */
-    public function Renew($domainName, $period)
+    public function renew($domainName, $period)
     {
         $parameters = [
             "request" => [
@@ -1206,14 +1233,14 @@ class DomainNameAPI_PHPLibrary
 
             if (isset($data["ExpirationDate"])) {
                 return [
-                    'result' => 'OK',
+                    'result' => self::RESULT_OK,
                     'data'   => [
                         'ExpirationDate' => $data["ExpirationDate"]
                     ]
                 ];
             } else {
                 return [
-                    'result' => 'ERROR',
+                    'result' => self::RESULT_ERROR,
                     'error'  => $this->setError("DOMAIN_RENEW")
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_RENEW] " . self::DEFAULT_ERRORS['DOMAIN_RENEW']['description']));
@@ -1237,7 +1264,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Registration status and domain information
      * @see examples/RegisterWithContactInfo.php
      */
-    public function RegisterWithContactInfo(
+    public function registerWithContactInfo(
         $domainName,
         $period,
         $contacts,
@@ -1322,13 +1349,13 @@ class DomainNameAPI_PHPLibrary
             if (isset($data["DomainInfo"]) && is_array($data["DomainInfo"])) {
                 // Parse domain info
                 $result = [
-                    'result' => 'OK',
+                    'result' => self::RESULT_OK,
                     'data'   => $this->parseDomainInfo($data["DomainInfo"])
                 ];
             } else {
                 // Set error
                 $result = [
-                    'result' => 'ERROR',
+                    'result' => self::RESULT_ERROR,
                     'error'  => $this->setError("DOMAIN_REGISTER")
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_REGISTER] " . self::DEFAULT_ERRORS['DOMAIN_REGISTER']['description']));
@@ -1350,7 +1377,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Operation result
      * @see examples/ModifyPrivacyProtectionStatus.php
      */
-    public function ModifyPrivacyProtectionStatus($domainName, $status, $reason = self::DEFAULT_REASON)
+    public function modifyPrivacyProtectionStatus($domainName, $status, $reason = self::DEFAULT_REASON)
     {
         $parameters = [
             "request" => [
@@ -1365,7 +1392,7 @@ class DomainNameAPI_PHPLibrary
                 'data'   => [
                     'PrivacyProtectionStatus' => $parameters["request"]["ProtectPrivacy"]
                 ],
-                'result' => 'OK'
+                'result' => self::RESULT_OK
             ];
         });
     }
@@ -1378,7 +1405,7 @@ class DomainNameAPI_PHPLibrary
      * @return array Updated domain information
      * @see examples/SyncFromRegistry.php
      */
-    public function SyncFromRegistry($domainName)
+    public function syncFromRegistry($domainName)
     {
         $parameters = [
             "request" => [
@@ -1394,13 +1421,13 @@ class DomainNameAPI_PHPLibrary
                 // Parse domain info
                 $result = [
                     'data'   => $this->parseDomainInfo($data["DomainInfo"]),
-                    'result' => 'OK'
+                    'result' => self::RESULT_OK
                 ];
             } else {
                 // Set error
                 $result = [
                     'error'  => $this->setError("DOMAIN_SYNC"),
-                    'result' => 'ERROR'
+                    'result' => self::RESULT_ERROR
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_SYNC] " . self::DEFAULT_ERRORS['DOMAIN_SYNC']['description']));
             }
@@ -1409,7 +1436,7 @@ class DomainNameAPI_PHPLibrary
         });
     }
 
-    public function CheckTransfer($domainName,$authcode)
+    public function checkTransfer($domainName,$authcode)
     {
         $parameters = [
             "request" => [
@@ -1421,7 +1448,7 @@ class DomainNameAPI_PHPLibrary
         return self::parseCall(__FUNCTION__, $parameters, function ($response) use ($parameters) {
             $data = $response[key($response)];
             return [
-                'result' => $data['OperationResult'] == 'SUCCESS' ? 'OK' : 'ERROR'
+                'result' => $data['OperationResult'] == self::RESULT_SUCCESS ? self::RESULT_OK : self::RESULT_ERROR
             ];
         });
     }
@@ -1491,7 +1518,7 @@ class DomainNameAPI_PHPLibrary
                     }
                 }
             }
-        } elseif (count($response) != 1) {
+        } elseif (count($response) < 1) {
             // Set error data
             $result            = [];
             $result["Code"]    = "RESPONSE_COUNT";
@@ -1503,7 +1530,7 @@ class DomainNameAPI_PHPLibrary
             $result["Code"]    = "RESPONSE_CODE";
             $result["Message"] = self::DEFAULT_ERRORS['RESPONSE_CODE']['message'];
             $result["Details"] = self::DEFAULT_ERRORS['RESPONSE_CODE']['description'];
-        } elseif (strtoupper($response[key($response)]["OperationResult"]) != "SUCCESS") {
+        } elseif (strtoupper($response[key($response)]["OperationResult"]) != self::RESULT_SUCCESS) {
             // Set error data
             $result = [
                 "Code"    => '',
@@ -1832,13 +1859,13 @@ class DomainNameAPI_PHPLibrary
     private function parseCall($fn, $parameters, $_callback): array
     {
         $result = [
-            'result' => 'ERROR',
+            'result' => self::RESULT_ERROR,
             'error'  => 'Unknown Error Occurred'
         ];
 
         try {
             // Sample performance metrics with 2.5% rate
-            $shouldSamplePerformance = (mt_rand(1, 1000) <= 25);
+            $shouldSamplePerformance = (mt_rand(1, 1000) <= self::PERFORMANCE_SAMPLE_RATE);
 
             $parameters["request"]["UserName"] = $this->serviceUsername;
             $parameters["request"]["Password"] = $this->servicePassword;
@@ -1859,7 +1886,7 @@ class DomainNameAPI_PHPLibrary
             if (!$this->hasError($_response)) {
                 $result = $_callback($_response);
             } else {
-                $result["result"] = "ERROR";
+                $result["result"] = self::RESULT_ERROR;
                 $result["error"]  = $this->parseError($_response);
             }
 
@@ -1869,18 +1896,18 @@ class DomainNameAPI_PHPLibrary
                 $this->sendPerformanceMetricsToSentry([
                     'operation' => $fn,
                     'duration'  => floatval($duration),
-                    'success'   => ($result['result'] === 'OK'),
+                    'success'   => ($result['result'] === self::RESULT_OK),
                     'timestamp' => gmdate('Y-m-d\TH:i:s.', time()) . sprintf('%03d', round(fmod(microtime(true), 1) * 1000)) . 'Z',
                     'start_timestamp' => gmdate('Y-m-d\TH:i:s.', (int)$this->startAt) . sprintf('%03d', round(fmod($this->startAt, 1) * 1000)) . 'Z'
                 ]);
             }
 
         } catch (SoapFault $ex) {
-            $result["result"] = "ERROR";
+            $result["result"] = self::RESULT_ERROR;
             $result["error"]  = $this->setError('RESPONSE_SOAP', self::DEFAULT_ERRORS['RESPONSE_SOAP']['description'], $ex->getMessage());
             $this->sendErrorToSentryAsync($ex);
         } catch (Exception $ex) {
-            $result["result"] = "ERROR";
+            $result["result"] = self::RESULT_ERROR;
             $result["error"]  = $this->parseError($this->objectToArray($ex));
             $this->sendErrorToSentryAsync($ex);
         }
@@ -2316,7 +2343,7 @@ class DomainNameAPI_PHPLibrary
         // IP adresini alma ve cacheleme
         try {
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, "http://ipecho.net/plain");
+            curl_setopt($ch, CURLOPT_URL, "https://ipecho.net/plain");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             curl_setopt($ch, CURLOPT_TIMEOUT, 2);
             $external_ip = curl_exec($ch);
