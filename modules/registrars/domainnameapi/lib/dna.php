@@ -10,7 +10,7 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.21
+ * @version 2.1.22
  */
 
 namespace DomainNameApi;
@@ -24,7 +24,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.21';
+    const VERSION = '2.1.22';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -121,7 +121,7 @@ class DomainNameAPI_PHPLibrary
     ];
 
     const DEFAULT_CACHE_TTL = 512;
-    const DEFAULT_TIMEOUT   = 20;
+    const DEFAULT_TIMEOUT   = 30;
     const DEFAULT_REASON    = 'Owner request';
     const PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
 
@@ -182,6 +182,11 @@ class DomainNameAPI_PHPLibrary
             'id'   => 2,
             'code' => 'USD',
             'name' => 'US Dollar'
+        ],
+        'EUR' => [
+            'id'   => 3,
+            'code' => 'EUR',
+            'name' => 'Euro'
         ]
     ];
 
@@ -191,7 +196,7 @@ class DomainNameAPI_PHPLibrary
     private bool $errorReportingEnabled = true;
     /**
      * Error Reporting Will send this sentry endpoint, if errorReportingEnabled is true
-     * This request does not include sensitive informations, sensitive informations are filtered.
+     * This request does not include sensitive information, sensitive data is filtered.
      * @var string $errorReportingDsn
      */
     private string $errorReportingDsn  = 'https://0ea94fed70c09f95c17dfa211d43ac66@sentry.atakdomain.com/2';
