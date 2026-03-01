@@ -10,9 +10,8 @@
 /**
  * Class DomainNameAPI_PHPLibrary
  * @package DomainNameApi
- * @version 2.1.20
+ * @version 2.1.21
  */
-
 
 namespace DomainNameApi;
 
@@ -25,7 +24,7 @@ class DomainNameAPI_PHPLibrary
     /**
      * Version of the library
      */
-    const VERSION = '2.1.20';
+    const VERSION = '2.1.21';
 
     const DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',
@@ -40,6 +39,7 @@ class DomainNameAPI_PHPLibrary
         'balance is not sufficient',
         'Price definition not found',
         'TLD is not supported',
+        'Invalid API credentials',
     ];
 
     const DEFAULT_ERRORS = [
@@ -204,7 +204,7 @@ class DomainNameAPI_PHPLibrary
      */
     private string $serviceUsername = "ownername";
 
-    /*
+    /**
      * Api Password
      * @var string $servicePassword
      */
@@ -228,10 +228,11 @@ class DomainNameAPI_PHPLibrary
 
     /**
      * DomainNameAPI_PHPLibrary constructor.
-     * @param string $userName
-     * @param string $password
-     * @param bool $testMode
-     * @throws Exception | SoapFault
+     *
+     * @param string $userName API username for authentication
+     * @param string $password API password for authentication
+     * @param bool $testmode Enable test/OTE environment
+     * @throws Exception|SoapFault When SOAP connection fails
      */
     public function __construct($userName = "ownername", $password = "ownerpass",$testmode=false)
     {
@@ -265,6 +266,11 @@ class DomainNameAPI_PHPLibrary
         }
     }
 
+    /**
+     * Detect and set the application context based on file path
+     *
+     * @return void
+     */
     private function setApplication()
     {
         $dir                      = __FILE__;
@@ -283,8 +289,11 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
-     * Deprecated
-     * @param bool $value
+     * Switch service URL to test environment
+     *
+     * @deprecated Use constructor $testmode parameter instead
+     * @param bool $value Enable or disable test mode
+     * @return void
      */
     private function useTestMode($value = true)
     {
@@ -295,9 +304,10 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
-     * SET Username and Password
-     * @param $userName
-     * @param $password
+     * Set API authentication credentials
+     *
+     * @param string $userName API username
+     * @param string $password API password
      * @return void
      */
     private function setCredentials($userName, $password)
@@ -1025,8 +1035,9 @@ class DomainNameAPI_PHPLibrary
      * Saves or updates contact information for all contact types of a domain
      *
      * @param string $domainName The domain name to update contacts for
-     * @param array $contacts
-     * @return array
+     * @param array $contacts Associative array with Administrative, Billing, Technical, Registrant keys
+     * @return array Operation result
+     * @see examples/SaveContacts.php
      */
     public function saveContacts($domainName, $contacts)
     {
@@ -1239,11 +1250,12 @@ class DomainNameAPI_PHPLibrary
                     ]
                 ];
             } else {
+                $this->sendErrorToSentryAsync(new Exception("[DOMAIN_RENEW] " . self::DEFAULT_ERRORS['DOMAIN_RENEW']['description']));
                 return [
                     'result' => self::RESULT_ERROR,
                     'error'  => $this->setError("DOMAIN_RENEW")
                 ];
-                $this->sendErrorToSentryAsync(new Exception("[DOMAIN_RENEW] " . self::DEFAULT_ERRORS['DOMAIN_RENEW']['description']));
+
             }
         });
 
@@ -1436,7 +1448,14 @@ class DomainNameAPI_PHPLibrary
         });
     }
 
-    public function checkTransfer($domainName,$authcode)
+    /**
+     * Check if domain transfer is possible
+     *
+     * @param string $domainName Domain name to check transfer for
+     * @param string $authcode Authorization/EPP code for transfer
+     * @return array Operation result
+     */
+    public function checkTransfer($domainName, $authcode)
     {
         $parameters = [
             "request" => [
@@ -2160,9 +2179,10 @@ class DomainNameAPI_PHPLibrary
 
 
     /**
-     * Domain is TR type
-     * @param $domain
-     * @return bool
+     * Check if domain has a .tr TLD
+     *
+     * @param string $domain Domain name to check
+     * @return bool True if domain ends with .tr
      */
     public function isTrTLD($domain)
     {
