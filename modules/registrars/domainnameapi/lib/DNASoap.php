@@ -11,7 +11,7 @@
  * Class DNASoap
  * SOAP API implementation for DomainNameAPI
  * @package DomainNameApi
- * @version 3.0.0
+ * @version 3.0.1
  */
 
 namespace DomainNameApi;

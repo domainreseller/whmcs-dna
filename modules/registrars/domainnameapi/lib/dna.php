@@ -15,7 +15,7 @@
  *   - Normal username → DNASoap (SOAP API)
  *
  * @package DomainNameApi
- * @version 3.0.0
+ * @version 3.0.1
  */
 
 namespace DomainNameApi;
