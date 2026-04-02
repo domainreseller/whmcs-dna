@@ -11,10 +11,10 @@ trait SharedApiConfigAndUtilsTrait
      */
     public static $VERSION = '3.0.0'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
 
-    const PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
-    const RESULT_OK      = 'OK';
-    const RESULT_ERROR   = 'ERROR';
-    const RESULT_SUCCESS = 'SUCCESS';
+    public static $PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
+    public static $RESULT_OK      = 'OK';
+    public static $RESULT_ERROR   = 'ERROR';
+    public static $RESULT_SUCCESS = 'SUCCESS';
 
     public static $DEFAULT_NAMESERVERS = [
         'ns1.domainnameapi.com',

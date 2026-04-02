@@ -352,7 +352,7 @@ class DNARest
             $resp = [];
 
             if (isset($response['resellerId'])) {
-                $resp['result'] = self::RESULT_OK;
+                $resp['result'] = self::$RESULT_OK;
                 $resp['id']     = $response['resellerId'];
                 $resp['active'] = true; // API'den status gelmiyor, varsayılan true
                 $resp['name']   = $response['resellerName'] ?? '';
@@ -377,7 +377,7 @@ class DNARest
                 ];
                 $resp['balances'] = $balances;
             } else {
-                $resp['result'] = self::RESULT_ERROR;
+                $resp['result'] = self::$RESULT_ERROR;
                 $resp['error']  = $this->setError('CREDENTIALS', 'Invalid response format',
                     'Response does not contain required fields');
             }
@@ -385,7 +385,7 @@ class DNARest
             return $resp;
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'RESELLER_DETAILS', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -426,7 +426,7 @@ class DNARest
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'BALANCE', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -453,7 +453,7 @@ class DNARest
 
             if (empty($queries)) {
                 return [
-                    'result' => self::RESULT_ERROR,
+                    'result' => self::$RESULT_ERROR,
                     'error'  => $this->setError('AVAILABILITY', 'Domain names not found.', 'No domain names provided for availability check')
                 ];
             }
@@ -488,7 +488,7 @@ class DNARest
             return $availabilityData;
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'AVAILABILITY', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -537,12 +537,12 @@ class DNARest
                         ];
                     }, $response['items']) : [],
                 ],
-                'result'     => self::RESULT_OK,
+                'result'     => self::$RESULT_OK,
                 'TotalCount' => (int)($response['totalCount'] ?? 0),
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'DOMAIN_LIST', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -627,11 +627,11 @@ class DNARest
 
             return [
                 'data'   => $tldData,
-                'result' => self::RESULT_OK
+                'result' => self::$RESULT_OK
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'TLD_LIST', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -651,7 +651,7 @@ class DNARest
             return $this->parseDomainInfo($response);
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'DOMAIN_DETAILS', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -671,14 +671,14 @@ class DNARest
             $response = $this->request('PUT', 'domains/dns/name-server', $payload);
 
             return [
-                'result' => self::RESULT_OK,
+                'result' => self::$RESULT_OK,
                 'data'   => [
                     'NameServers' => $response['nameServers'] ?? $nameServers
                 ]
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'MODIFY_NS', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -697,14 +697,14 @@ class DNARest
             $response = $this->request('POST', 'domains/lock', $data);
 
             return [
-                'result' => self::RESULT_OK,
+                'result' => self::$RESULT_OK,
                 'data'   => [
                     'LockStatus' => true
                 ]
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'ENABLE_LOCK', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -722,14 +722,14 @@ class DNARest
             $data     = ['domainName' => $domainName];
             $response = $this->request('POST', 'domains/unlock', $data);
             return [
-                'result' => self::RESULT_OK,
+                'result' => self::$RESULT_OK,
                 'data'   => [
                     'LockStatus' => false
                 ]
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'DISABLE_LOCK', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -759,7 +759,7 @@ class DNARest
             $response = $this->request('POST', 'domains/dns/host', $payload);
 
             return [
-                'result' => self::RESULT_OK,
+                'result' => self::$RESULT_OK,
                 'data'   => [
                     'NameServer' => $nameServer,
                     'IPAdresses' => [$ipAddress]
@@ -767,7 +767,7 @@ class DNARest
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'ADD_CHILD_NS', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -790,14 +790,14 @@ class DNARest
             $response = $this->request('DELETE', 'domains/dns/host' ,$payload);
 
             return [
-                'result' => self::RESULT_OK,
+                'result' => self::$RESULT_OK,
                 'data'   => [
                     'NameServer' => $nameServer
                 ]
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'DELETE_CHILD_NS', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -828,7 +828,7 @@ class DNARest
             $response = $this->request('PUT', 'domains/dns/host', $payload);
 
             return [
-                'result' => self::RESULT_OK,
+                'result' => self::$RESULT_OK,
                 'data'   => [
                     'NameServer' => $response['hostName'] ?? $nameServer,
                     'IPAdresses' => $response['ipAddresses'] ?? [$ipAddress]
@@ -836,7 +836,7 @@ class DNARest
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'MODIFY_CHILD_NS', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -881,11 +881,11 @@ class DNARest
 
             return [
                 'data'   => ['contacts' => $orderedContacts],
-                'result' => self::RESULT_OK
+                'result' => self::$RESULT_OK
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'GET_CONTACTS', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -915,12 +915,12 @@ class DNARest
             }
 
             return [
-                'result' => self::RESULT_OK,
+                'result' => self::$RESULT_OK,
                 'data'   => ['contacts' => $parsedContacts]
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'SAVE_CONTACTS', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -957,7 +957,7 @@ class DNARest
             return $this->parseDomainInfo($response);
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'TRANSFER_DOMAIN', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -975,7 +975,7 @@ class DNARest
             $response = $this->request('POST', "domains/transfers/cancel", ['domainName' => $domainName]);
 
             return [
-                'result' => self::RESULT_OK,
+                'result' => self::$RESULT_OK,
                 'data'   => [
                     'DomainName' => $domainName,
                     'Status'     => $response['status'] ?? 'Cancelled'
@@ -983,7 +983,7 @@ class DNARest
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'CANCEL_TRANSFER', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -1001,7 +1001,7 @@ class DNARest
             $response = $this->request('POST', "domains/transfers/approve", ['domainName' => $domainName]);
 
             return [
-                'result' => self::RESULT_OK,
+                'result' => self::$RESULT_OK,
                 'data'   => [
                     'DomainName' => $domainName,
                     'Status'     => $response['status'] ?? 'Approved'
@@ -1009,7 +1009,7 @@ class DNARest
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'APPROVE_TRANSFER', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -1027,7 +1027,7 @@ class DNARest
             $response = $this->request('POST', "domains/transfers/reject", ['domainName' => $domainName]);
 
             return [
-                'result' => self::RESULT_OK,
+                'result' => self::$RESULT_OK,
                 'data'   => [
                     'DomainName' => $domainName,
                     'Status'     => $response['status'] ?? 'Rejected'
@@ -1035,7 +1035,7 @@ class DNARest
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'REJECT_TRANSFER', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -1056,7 +1056,7 @@ class DNARest
 
             if ($response["expirationDate"] ?? false) {
                 return [
-                    'result' => self::RESULT_OK,
+                    'result' => self::$RESULT_OK,
                     'data'   => [
                         'ExpirationDate' => isset($response['expirationDate']) ? date('Y-m-d\TH:i:s', strtotime($response['expirationDate'])) : ''
                     ]
@@ -1064,13 +1064,13 @@ class DNARest
             } else {
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_RENEW] " . self::$DEFAULT_ERRORS['DOMAIN_RENEW']['description']));
                 return [
-                    'result' => self::RESULT_ERROR,
+                    'result' => self::$RESULT_ERROR,
                     'error'  => $this->setError("DOMAIN_RENEW")
                 ];
             }
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'RENEW_DOMAIN', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -1118,7 +1118,7 @@ class DNARest
             return $this->parseDomainInfo($response);
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'REGISTER_DOMAIN', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -1147,11 +1147,11 @@ class DNARest
                 'data'   => [
                     'PrivacyProtectionStatus' => $status
                 ],
-                'result' => self::RESULT_OK
+                'result' => self::$RESULT_OK
             ];
         } catch (Exception $e) {
             return [
-                'result' => self::RESULT_ERROR,
+                'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'MODIFY_PRIVACY', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
@@ -1233,7 +1233,7 @@ class DNARest
                     ];
                 }, $data['hosts']) : []
             ],
-            'result' => self::RESULT_OK
+            'result' => self::$RESULT_OK
         ];
     }
 

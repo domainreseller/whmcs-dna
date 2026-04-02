@@ -288,7 +288,7 @@ class DNASoap
             $resp = [];
 
             if (isset($data['ResellerInfo'])) {
-                $resp['result'] = self::RESULT_OK;
+                $resp['result'] = self::$RESULT_OK;
                 $resp['id']     = $data['ResellerInfo']['Id'];
                 $resp['active'] = $data['ResellerInfo']['Status'] == 'Active';
                 $resp['name']   = $data['ResellerInfo']['Name'];
@@ -312,7 +312,7 @@ class DNASoap
                 $resp['symbol']   = $active_currency['CurrencySymbol'];
                 $resp['balances'] = $balances;
             } else {
-                $resp['result'] = self::RESULT_ERROR;
+                $resp['result'] = self::$RESULT_ERROR;
                 $resp['error']  = $this->setError("CREDENTIALS");
             }
 
@@ -461,11 +461,11 @@ class DNASoap
                     }
                 }
 
-                $result["result"]     = self::RESULT_OK;
+                $result["result"]     = self::$RESULT_OK;
                 $result["TotalCount"] = $data["TotalCount"];
             } else {
                 // Set error
-                $result["result"] = self::RESULT_ERROR;
+                $result["result"] = self::$RESULT_ERROR;
                 $result["error"]  = $this->setError("DOMAIN_LIST");
 
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_LIST] " . self::$DEFAULT_ERRORS['DOMAIN_LIST']['description']));
@@ -528,12 +528,12 @@ class DNASoap
 
                 $result = [
                     'data'   => $extensions,
-                    'result' => self::RESULT_OK
+                    'result' => self::$RESULT_OK
                 ];
             } else {
                 // Set error
                 $result = [
-                    'result' => self::RESULT_ERROR,
+                    'result' => self::$RESULT_ERROR,
                     'error'  => $this->setError("TLD_LIST")
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[TLD_LIST] " . self::$DEFAULT_ERRORS['TLD_LIST']['description']));
@@ -569,10 +569,10 @@ class DNASoap
                 // Parse domain info
 
                 $result["data"]   = $this->parseDomainInfo($data["DomainInfo"]);
-                $result["result"] = self::RESULT_OK;
+                $result["result"] = self::$RESULT_OK;
             } else {
                 // Set error
-                $result["result"] = self::RESULT_ERROR;
+                $result["result"] = self::$RESULT_ERROR;
                 $result["error"]  = $this->setError("DOMAIN_DETAILS");
 
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_DETAILS] " . self::$DEFAULT_ERRORS['DOMAIN_DETAILS']['description']));
@@ -607,7 +607,7 @@ class DNASoap
 
             $result["data"]                = [];
             $result["data"]["NameServers"] = $parameters["request"]["NameServerList"];
-            $result["result"]              = self::RESULT_OK;
+            $result["result"]              = self::$RESULT_OK;
 
             return $result;
         });
@@ -637,7 +637,7 @@ class DNASoap
                 'data'   => [
                     'LockStatus' => true
                 ],
-                'result' => self::RESULT_OK
+                'result' => self::$RESULT_OK
             ];
         });
 
@@ -667,7 +667,7 @@ class DNASoap
                 'data'   => [
                     'LockStatus' => false
                 ],
-                'result' => self::RESULT_OK
+                'result' => self::$RESULT_OK
             ];
         });
 
@@ -702,7 +702,7 @@ class DNASoap
                     'NameServer' => $parameters["request"]["ChildNameServer"],
                     'IPAdresses' => $parameters["request"]["IpAddressList"]
                 ],
-                'result' => self::RESULT_OK
+                'result' => self::$RESULT_OK
             ];
         });
 
@@ -733,7 +733,7 @@ class DNASoap
                 'data'   => [
                     'NameServer' => $parameters["request"]["ChildNameServer"],
                 ],
-                'result' => self::RESULT_OK
+                'result' => self::$RESULT_OK
             ];
         });
 
@@ -767,7 +767,7 @@ class DNASoap
                     'NameServer' => $parameters["request"]["ChildNameServer"],
                     'IPAdresses' => $parameters["request"]["IpAddressList"]
                 ],
-                'result' => self::RESULT_OK
+                'result' => self::$RESULT_OK
             ];
         });
 
@@ -811,13 +811,13 @@ class DNASoap
                             'Technical'      => $this->parseContactInfo($data["TechnicalContact"]),
                         ]
                     ],
-                    'result' => self::RESULT_OK
+                    'result' => self::$RESULT_OK
                 ];
             } else {
                 // Set error
                 $result = [
                     'error'  => $this->setError("CONTACT_INFO"),
-                    'result' => self::RESULT_ERROR
+                    'result' => self::$RESULT_ERROR
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[CONTACT_INFO] " . self::$DEFAULT_ERRORS['CONTACT_INFO']['description']));
             }
@@ -855,14 +855,14 @@ class DNASoap
 
             $result = [];
 
-            if ($data['OperationResult'] == self::RESULT_SUCCESS) {
+            if ($data['OperationResult'] == self::$RESULT_SUCCESS) {
                 $result = [
-                    'result' => self::RESULT_OK
+                    'result' => self::$RESULT_OK
                 ];
             } else {
                 // Set error
                 $result = [
-                    'result' => self::RESULT_ERROR,
+                    'result' => self::$RESULT_ERROR,
                     'error'  => $this->setError("CONTACT_SAVE")
                 ];
 
@@ -909,13 +909,13 @@ class DNASoap
             if (isset($data["DomainInfo"]) && is_array($data["DomainInfo"])) {
                 // Parse domain info
                 $result = [
-                    'result' => self::RESULT_OK,
+                    'result' => self::$RESULT_OK,
                     'data'   => $this->parseDomainInfo($data["DomainInfo"])
                 ];
             } else {
                 // Set error
                 $result = [
-                    'result' => self::RESULT_ERROR,
+                    'result' => self::$RESULT_ERROR,
                     'data'   => $this->setError("DOMAIN_TRANSFER_REQUEST")
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_TRANSFER_REQUEST] " . self::$DEFAULT_ERRORS['DOMAIN_TRANSFER_REQUEST']['description']));
@@ -948,7 +948,7 @@ class DNASoap
             $data = $response[key($response)];
 
             return [
-                'result' => $data['OperationResult'] == self::RESULT_SUCCESS ? self::RESULT_OK : self::RESULT_ERROR,
+                'result' => $data['OperationResult'] == self::$RESULT_SUCCESS ? self::$RESULT_OK : self::$RESULT_ERROR,
                 'data'   => [
                     'DomainName' => $parameters["request"]["DomainName"]
                 ]
@@ -979,7 +979,7 @@ class DNASoap
             $data = $response[key($response)];
 
             return [
-                'result' => $data['OperationResult'] == self::RESULT_SUCCESS ? self::RESULT_OK : self::RESULT_ERROR,
+                'result' => $data['OperationResult'] == self::$RESULT_SUCCESS ? self::$RESULT_OK : self::$RESULT_ERROR,
                 'data'   => [
                     'DomainName' => $parameters["request"]["DomainName"]
                 ]
@@ -1009,7 +1009,7 @@ class DNASoap
             $data = $response[key($response)];
 
             return [
-                'result' => $data['OperationResult'] == self::RESULT_SUCCESS ? self::RESULT_OK : self::RESULT_ERROR,
+                'result' => $data['OperationResult'] == self::$RESULT_SUCCESS ? self::$RESULT_OK : self::$RESULT_ERROR,
                 'data'   => [
                     'DomainName' => $parameters["request"]["DomainName"]
                 ]
@@ -1042,14 +1042,14 @@ class DNASoap
 
             if (isset($data["ExpirationDate"])) {
                 return [
-                    'result' => self::RESULT_OK,
+                    'result' => self::$RESULT_OK,
                     'data'   => [
                         'ExpirationDate' => $data["ExpirationDate"]
                     ]
                 ];
             } else {
                 return [
-                    'result' => self::RESULT_ERROR,
+                    'result' => self::$RESULT_ERROR,
                     'error'  => $this->setError("DOMAIN_RENEW")
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_RENEW] " . self::$DEFAULT_ERRORS['DOMAIN_RENEW']['description']));
@@ -1162,13 +1162,13 @@ class DNASoap
             if (isset($data["DomainInfo"]) && is_array($data["DomainInfo"])) {
                 // Parse domain info
                 $result = [
-                    'result' => self::RESULT_OK,
+                    'result' => self::$RESULT_OK,
                     'data'   => $this->parseDomainInfo($data["DomainInfo"])
                 ];
             } else {
                 // Set error
                 $result = [
-                    'result' => self::RESULT_ERROR,
+                    'result' => self::$RESULT_ERROR,
                     'error'  => $this->setError("DOMAIN_REGISTER")
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_REGISTER] " . self::$DEFAULT_ERRORS['DOMAIN_REGISTER']['description']));
@@ -1205,7 +1205,7 @@ class DNASoap
                 'data'   => [
                     'PrivacyProtectionStatus' => $parameters["request"]["ProtectPrivacy"]
                 ],
-                'result' => self::RESULT_OK
+                'result' => self::$RESULT_OK
             ];
         });
     }
@@ -1234,13 +1234,13 @@ class DNASoap
                 // Parse domain info
                 $result = [
                     'data'   => $this->parseDomainInfo($data["DomainInfo"]),
-                    'result' => self::RESULT_OK
+                    'result' => self::$RESULT_OK
                 ];
             } else {
                 // Set error
                 $result = [
                     'error'  => $this->setError("DOMAIN_SYNC"),
-                    'result' => self::RESULT_ERROR
+                    'result' => self::$RESULT_ERROR
                 ];
                 $this->sendErrorToSentryAsync(new Exception("[DOMAIN_SYNC] " . self::$DEFAULT_ERRORS['DOMAIN_SYNC']['description']));
             }
@@ -1268,7 +1268,7 @@ class DNASoap
         return self::parseCall(__FUNCTION__, $parameters, function ($response) use ($parameters) {
             $data = $response[key($response)];
             return [
-                'result' => $data['OperationResult'] == self::RESULT_SUCCESS ? self::RESULT_OK : self::RESULT_ERROR
+                'result' => $data['OperationResult'] == self::$RESULT_SUCCESS ? self::$RESULT_OK : self::$RESULT_ERROR
             ];
         });
     }
@@ -1350,7 +1350,7 @@ class DNASoap
             $result["Code"]    = "RESPONSE_CODE";
             $result["Message"] = self::$DEFAULT_ERRORS['RESPONSE_CODE']['message'];
             $result["Details"] = self::$DEFAULT_ERRORS['RESPONSE_CODE']['description'];
-        } elseif (strtoupper($response[key($response)]["OperationResult"]) != self::RESULT_SUCCESS) {
+        } elseif (strtoupper($response[key($response)]["OperationResult"]) != self::$RESULT_SUCCESS) {
             // Set error data
             $result = [
                 "Code"    => '',
@@ -1655,13 +1655,13 @@ class DNASoap
     private function parseCall($fn, $parameters, $_callback): array
     {
         $result = [
-            'result' => self::RESULT_ERROR,
+            'result' => self::$RESULT_ERROR,
             'error'  => 'Unknown Error Occurred'
         ];
 
         try {
             // Sample performance metrics with 2.5% rate
-            $shouldSamplePerformance = (mt_rand(1, 1000) <= self::PERFORMANCE_SAMPLE_RATE);
+            $shouldSamplePerformance = (mt_rand(1, 1000) <= self::$PERFORMANCE_SAMPLE_RATE);
 
             $parameters["request"]["UserName"] = $this->serviceUsername;
             $parameters["request"]["Password"] = $this->servicePassword;
@@ -1682,7 +1682,7 @@ class DNASoap
             if (!$this->hasError($_response)) {
                 $result = $_callback($_response);
             } else {
-                $result["result"] = self::RESULT_ERROR;
+                $result["result"] = self::$RESULT_ERROR;
                 $result["error"]  = $this->parseError($_response);
             }
 
@@ -1692,18 +1692,18 @@ class DNASoap
                 $this->sendPerformanceMetricsToSentry([
                     'operation' => $fn,
                     'duration'  => floatval($duration),
-                    'success'   => ($result['result'] === self::RESULT_OK),
+                    'success'   => ($result['result'] === self::$RESULT_OK),
                     'timestamp' => gmdate('Y-m-d\TH:i:s.', time()) . sprintf('%03d', round(fmod(microtime(true), 1) * 1000)) . 'Z',
                     'start_timestamp' => gmdate('Y-m-d\TH:i:s.', (int)$this->startAt) . sprintf('%03d', round(fmod($this->startAt, 1) * 1000)) . 'Z'
                 ]);
             }
 
         } catch (SoapFault $ex) {
-            $result["result"] = self::RESULT_ERROR;
+            $result["result"] = self::$RESULT_ERROR;
             $result["error"]  = $this->setError('RESPONSE_SOAP', self::$DEFAULT_ERRORS['RESPONSE_SOAP']['description'], $ex->getMessage());
             $this->sendErrorToSentryAsync($ex);
         } catch (Exception $ex) {
-            $result["result"] = self::RESULT_ERROR;
+            $result["result"] = self::$RESULT_ERROR;
             $result["error"]  = $this->parseError($this->objectToArray($ex));
             $this->sendErrorToSentryAsync($ex);
         }
