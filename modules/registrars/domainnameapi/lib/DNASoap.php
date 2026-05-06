@@ -11,7 +11,7 @@
  * Class DNASoap
  * SOAP API implementation for DomainNameAPI
  * @package DomainNameApi
- * @version 3.0.1
+ * @version 3.0.2
  */
 
 namespace DomainNameApi;
@@ -1373,7 +1373,7 @@ class DNASoap
         }
 
         if (isset($result["Code"]) && $trace === true) {
-            $this->sendErrorToSentryAsync(new Exception("[API_ERROR]: " . $result["Code"] . " - " . $result["Message"] . " - " . $result["Details"]));
+            $this->sendErrorToSentryAsync(new Exception("[ERR]: " . $result["Code"] . " - " . $result["Message"] . " - " . $result["Details"]));
         }
 
         return $result;

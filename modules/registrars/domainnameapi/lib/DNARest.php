@@ -46,7 +46,10 @@ class DNARest
      * Api Service REST URL
      * @var string $serviceUrl
      */
-    private string $serviceUrl          = "https://rest-test.domainnameapi.com/api/v1";
+    public const URL_PROD = "https://api.domainresellerapi.com/api/v1";
+    public const URL_OTE  = "https://ote.domainresellerapi.com/api/v1";
+
+    private string $serviceUrl          = self::URL_PROD;
     private string $application         = "CORE";
     public array   $lastRequest         = [];
     public array   $lastResponse        = [];
@@ -69,8 +72,11 @@ class DNARest
      * @param string $token
      * @throws Exception
      */
-    public function __construct($resellerId, $token)
+    public function __construct($resellerId, $token,$testmode=false)
     {
+        if($testmode){
+            $this->serviceUrl = self::URL_OTE;
+        }
         $this->startAt = microtime(true);
         $this->_setApplication(__FILE__);
 
@@ -216,7 +222,7 @@ class DNARest
     private function formatErrorCode($code): string
     {
         if (is_numeric($code)) {
-            return 'API_' . $code . '_ERROR';
+            return 'API_' . $code ;
         }
         return (string)$code;
     }
@@ -610,17 +616,15 @@ class DNARest
                     }
 
                     $tldData[] = [
-                        'id'               => $idCounter++,
-                        'status'           => $tld['status'] ?? 'Active',
-                        'maxchar'          => $tld['constraints']['maxLenght'] ?? 63,
-                        'maxperiod'        => $tld['maxRegistrationPeriod'] ?? 10,
-                        'minchar'          => $tld['constraints']['minLength'] ?? 1,
-                        'minperiod'        => $tld['minRegistrationPeriod'] ?? 1,
-                        'tld'              => $tld['name'],
-                        'gracePeriod'      => $tld['addGracePeriod'] == 1,
-                        'redemptionPeriod' => $tld['failurePeriod'] == 1,
-                        'pricing'          => $pricing,
-                        'currencies'       => $currencies
+                        'id'         => $idCounter++,
+                        'status'     => $tld['status'] ?? 'Active',
+                        'maxchar'    => $tld['constraints']['maxLenght'] ?? 63,
+                        'maxperiod'  => $tld['maxRegistrationPeriod'] ?? 10,
+                        'minchar'    => $tld['constraints']['minLength'] ?? 1,
+                        'minperiod'  => $tld['minRegistrationPeriod'] ?? 1,
+                        'tld'        => $tld['name'],
+                        'pricing'    => $pricing,
+                        'currencies' => $currencies,
                     ];
                 }
             }
@@ -693,7 +697,7 @@ class DNARest
     public function enableTheftProtectionLock($domainName)
     {
         try {
-            $data     = ['domainName' => $domainName];
+            $data     = ['domainName' => $domainName, 'lockStatus' => true];
             $response = $this->request('POST', 'domains/lock', $data);
 
             return [
@@ -719,8 +723,8 @@ class DNARest
     public function disableTheftProtectionLock($domainName)
     {
         try {
-            $data     = ['domainName' => $domainName];
-            $response = $this->request('POST', 'domains/unlock', $data);
+            $data     = ['domainName' => $domainName, 'lockStatus' => false];
+            $response = $this->request('POST', 'domains/lock', $data);
             return [
                 'result' => self::$RESULT_OK,
                 'data'   => [
@@ -1113,7 +1117,7 @@ class DNARest
                 'additionalAttributes' => $additionalAttributes
             ];
 
-            $response = $this->request('POST', 'domains/register', $payload);
+            $response = $this->request('POST', 'domains/register-with-contacts', $payload);
 
             return $this->parseDomainInfo($response);
         } catch (Exception $e) {
@@ -1340,17 +1344,53 @@ class DNARest
     }
 
     /**
-     * Check if domain transfer is possible
-     * Not supported in REST API mode.
+     * Check whether a domain can be transferred with the given auth code.
+     * Mirrors the SOAP contract: returns {result: OK|ERROR}; OK iff the
+     * registry reports the domain is currently transferable. The richer
+     * fields the REST gateway returns (authCodeIsValid, transferLock, etc.)
+     * are surfaced under `data` for callers that want them.
      *
      * @param string $domainName Domain name to check transfer for
-     * @param string $authcode Authorization/EPP code for transfer
+     * @param string $authcode   Authorization/EPP code for transfer
      * @return array
-     * @throws Exception
      */
     public function checkTransfer($domainName, $authcode)
     {
-        throw new Exception("checkTransfer is not supported in REST API");
+        try {
+            $payload  = ['domainName' => $domainName, 'authCode' => $authcode];
+            $response = $this->request('POST', 'domains/transfers/check', $payload);
+
+            $available = !empty($response['transferAvailabilityStatus']);
+            $envelope = [
+                'result' => $available ? self::$RESULT_OK : self::$RESULT_ERROR,
+                'data'   => [
+                    'TransferAvailabilityStatus' => $available,
+                    'AuthCodeIsRequired'         => !empty($response['authCodeIsRequired']),
+                    'AuthCodeIsValid'            => !empty($response['authCodeIsValid']),
+                    'UserTransferRequired'       => !empty($response['userTransferRequired']),
+                    'TransferLock'               => !empty($response['transferLock']),
+                    'Message'                    => (string)($response['message'] ?? ''),
+                    'MessageKey'                 => (string)($response['messageKey'] ?? ''),
+                    'Additional'                 => isset($response['additionalAttributes'])
+                        ? (array)$response['additionalAttributes']
+                        : [],
+                ],
+            ];
+            if (!$available) {
+                $envelope['error'] = $this->setError(
+                    'TRANSFER_NOT_AVAILABLE',
+                    $response['message'] ?? 'Domain is not transferable',
+                    $response['messageKey'] ?? ($response['message'] ?? '')
+                );
+            }
+            return $envelope;
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'CHECK_TRANSFER', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
     }
 
     /**

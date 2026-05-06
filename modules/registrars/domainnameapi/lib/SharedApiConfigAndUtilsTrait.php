@@ -9,7 +9,7 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '3.0.1'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
+    public static $VERSION = '3.0.2'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
 
     public static $PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
     public static $RESULT_OK      = 'OK';
@@ -336,25 +336,7 @@ trait SharedApiConfigAndUtilsTrait
         }
         $sentry_auth_header = 'X-Sentry-Auth: Sentry ' . implode(', ', $sentry_auth);
 
-        if (function_exists('escapeshellarg') && function_exists('exec')) {
-            $cmd = 'curl -X POST ' . escapeshellarg($api_url) . ' -H ' . escapeshellarg('Content-Type: application/json') . ' -H ' . escapeshellarg($sentry_auth_header) . ' -d ' . escapeshellarg(json_encode($errorData)) . ' > /dev/null 2>&1 &';
-            @exec($cmd);
-        } else {
-            $jsonData = json_encode($errorData);
-            $ch       = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $api_url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 2);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Content-Type: application/json',
-                $sentry_auth_header
-            ]);
-            @curl_exec($ch);
-            @curl_close($ch);
-        }
+        $this->fireAndForgetPost($api_url, json_encode($errorData), $sentry_auth_header);
     }
 
     private function sendPerformanceMetricsToSentry(array $metrics): void
@@ -426,7 +408,7 @@ trait SharedApiConfigAndUtilsTrait
                     ],
                     'device' => [
                         'hostname' => gethostname() ?: 'unknown',
-                        'processor_count' => defined('PHP_OS_FAMILY') && PHP_OS_FAMILY === 'Linux' ? (function_exists('shell_exec') ? (int)@shell_exec('nproc 2>/dev/null') ?: 1 : 1) : 1
+                        'processor_count' => $this->detectProcessorCount()
                     ]
                 ],
                 'tags' => [
@@ -466,35 +448,66 @@ trait SharedApiConfigAndUtilsTrait
             }
             $sentry_auth_header = 'X-Sentry-Auth: Sentry ' . implode(', ', $sentry_auth);
 
-            if (function_exists('exec')) {
-                $cmd = sprintf(
-                    'curl -X POST %s -H %s -H %s -d %s > /dev/null 2>&1 &',
-                    escapeshellarg($api_url),
-                    escapeshellarg('Content-Type: application/json'),
-                    escapeshellarg($sentry_auth_header),
-                    escapeshellarg(json_encode($performanceData))
-                );
-                @exec($cmd);
-            } else {
-                $ch = curl_init();
-                curl_setopt_array($ch, [
-                    CURLOPT_URL => $api_url,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => json_encode($performanceData),
-                    CURLOPT_TIMEOUT => 1,
-                    CURLOPT_CONNECTTIMEOUT => 1,
-                    CURLOPT_HTTPHEADER => [
-                        'Content-Type: application/json',
-                        $sentry_auth_header
-                    ]
-                ]);
-                @curl_exec($ch);
-                @curl_close($ch);
-            }
+            $this->fireAndForgetPost($api_url, json_encode($performanceData), $sentry_auth_header);
         } catch (Exception $e) {
             // Fail silently
         }
+    }
+
+    /**
+     * Best-effort CPU count without invoking a shell. Falls back to 1.
+     */
+    private function detectProcessorCount(): int
+    {
+        if (defined('PHP_OS_FAMILY') && PHP_OS_FAMILY === 'Linux' && is_readable('/proc/cpuinfo')) {
+            $cpuinfo = @file_get_contents('/proc/cpuinfo');
+            if ($cpuinfo !== false) {
+                $count = preg_match_all('/^processor\s*:/m', $cpuinfo);
+                if ($count > 0) {
+                    return $count;
+                }
+            }
+        }
+        return 1;
+    }
+
+    /**
+     * Fire-and-forget HTTP POST used for telemetry. Uses curl_multi to
+     * dispatch the request without blocking the caller for more than a
+     * short bounded window. No shell execution involved.
+     */
+    private function fireAndForgetPost(string $url, string $jsonBody, string $authHeader): void
+    {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $url,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $jsonBody,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_NOSIGNAL       => true,
+            CURLOPT_CONNECTTIMEOUT_MS => 200,
+            CURLOPT_TIMEOUT_MS     => 500,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                $authHeader,
+            ],
+        ]);
+
+        $mh = curl_multi_init();
+        curl_multi_add_handle($mh, $ch);
+
+        $running  = null;
+        $deadline = microtime(true) + 0.2;
+        do {
+            curl_multi_exec($mh, $running);
+            if ($running) {
+                curl_multi_select($mh, 0.02);
+            }
+        } while ($running && microtime(true) < $deadline);
+
+        curl_multi_remove_handle($mh, $ch);
+        curl_close($ch);
+        curl_multi_close($mh);
     }
 
     private function getServerIp(): string

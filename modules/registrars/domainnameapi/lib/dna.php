@@ -15,7 +15,7 @@
  *   - Normal username → DNASoap (SOAP API)
  *
  * @package DomainNameApi
- * @version 3.0.1
+ * @version 3.0.2
  */
 
 namespace DomainNameApi;
@@ -46,7 +46,7 @@ class DomainNameAPI_PHPLibrary
     {
         if ($this->looksLikeUuid($userName)) {
             require_once __DIR__ . '/DNARest.php';
-            $this->client = new DNARest($userName, $password);
+            $this->client = new DNARest($userName, $password,$testmode);
         } else {
             require_once __DIR__ . '/DNASoap.php';
             $this->client = new DNASoap($userName, $password, $testmode);
