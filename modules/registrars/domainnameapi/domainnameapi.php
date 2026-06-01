@@ -884,7 +884,10 @@ function domainnameapi_GetTldPricing($params) {
 
     $values = [];
 
-    $tldlist = $dna->GetTldList(1200);
+    // REST gateway caps MaxResultCount at 1000 — anything higher returns
+    // 400 ModelState. SOAP doesn't have this cap but works fine with 1000
+    // too (total catalogue is ~850).
+    $tldlist = $dna->GetTldList(1000);
 
     $convertable_currencies = domainnameapi_exchangerates();
 
