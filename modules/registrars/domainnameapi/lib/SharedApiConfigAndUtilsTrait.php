@@ -9,7 +9,7 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '3.0.2'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
+    public static $VERSION = '3.0.3'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
 
     public static $PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
     public static $RESULT_OK      = 'OK';
@@ -198,6 +198,19 @@ trait SharedApiConfigAndUtilsTrait
         }
     }
 
+    /**
+     * Enable or disable Sentry telemetry at runtime. Useful for tests that
+     * deliberately probe the library with pathological inputs and would
+     * otherwise pollute the shared Sentry project with synthetic errors.
+     *
+     * @param bool $enabled
+     * @return void
+     */
+    public function setErrorReportingEnabled(bool $enabled): void
+    {
+        $this->errorReportingEnabled = $enabled;
+    }
+
     private function setError($code, $message = '', $details = ''): array
     {
         $result = [];
@@ -214,7 +227,21 @@ trait SharedApiConfigAndUtilsTrait
         return $result;
     }
 
+    /**
+     * Public entry point. Telemetry must NEVER throw into the host billing
+     * application (and it runs while the host is already handling an error),
+     * so the whole body is guarded against any Throwable, not just Exception.
+     */
     private function sendErrorToSentryAsync(Exception $e): void
+    {
+        try {
+            $this->doSendErrorToSentryAsync($e);
+        } catch (\Throwable $t) {
+            // Swallow — a telemetry failure must not surface in the host app.
+        }
+    }
+
+    private function doSendErrorToSentryAsync(Exception $e): void
     {
         if (!$this->errorReportingEnabled) {
             return;
@@ -270,21 +297,27 @@ trait SharedApiConfigAndUtilsTrait
         }
         $culpritClass = get_class($this);
 
+        // Stable classification: normalised message, volatile data as tags,
+        // explicit fingerprint. Without this Sentry groups on the variable
+        // backend message (IP, reseller id, domain) and shatters one logical
+        // error into hundreds of issues.
+        $classification = $this->buildSentryClassification($e);
+
         $errorData = [
             'event_id'  => bin2hex(random_bytes(16)),
             'timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
             'level'     => 'error',
             'logger'    => 'php',
             'platform'  => 'php',
-            'culprit'   => $culpritClass . ' via ' . $knownPath, 
+            'culprit'   => $culpritClass . ' via ' . $knownPath,
             'message'   => [
-                'formatted' => $e->getMessage()
+                'formatted' => $classification['value']
             ],
             'exception' => [
                 'values' => [
                     [
                         'type'       => str_replace(['DomainNameApi\\DNARest', 'DomainNameApi\\DNASoap', 'DomainNameApi\\DomainNameAPI_PHPLibrary'], [$this->application . ' Exception', $this->application . ' Exception', $this->application . ' Exception'], $culpritClass),
-                        'value'      => $e->getMessage(),
+                        'value'      => $classification['value'],
                         'stacktrace' => [
                             'frames' => [
                                 [
@@ -302,29 +335,44 @@ trait SharedApiConfigAndUtilsTrait
                     ]
                 ]
             ],
+            // `release` and `environment` are TOP-LEVEL event fields below,
+            // not tags — Sentry's Release Health / Performance-per-Release
+            // and environment selectors only honour the top-level form.
             'tags'      => [
                 'handled'         => 'yes',
                 'level'           => 'error',
-                'release'         => self::$VERSION,
-                'environment'     => 'production', // Consider making this configurable
                 'url'             => $_SERVER['REQUEST_URI'] ?? 'NA',
                 'transaction'     => $_SERVER['REQUEST_METHOD'] ?? 'NA',
                 'trace_id'        => bin2hex(random_bytes(8)),
                 'runtime_name'    => 'PHP',
                 'runtime_version' => phpversion(),
-                'ip_address'      => $external_ip,
                 'elapsed_time'    => number_format($elapsed_time, 4),
-                'vhost_user'      => $vhostUser,
                 'application'     => $this->application ?? 'UNKNOWN',
                 'extension_soap'  => extension_loaded('soap') ? 'enabled' : 'disabled',
-                'openssl_v'       => defined('OPENSSL_VERSION_TEXT') ? OPENSSL_VERSION_TEXT : 'NA',
-                'openssl_n'       => defined('OPENSSL_VERSION_NUMBER') ? OPENSSL_VERSION_NUMBER : 'NA',
             ],
             'extra'     => [
                 'request_data'  => method_exists($this, 'getRequestData') ? $this->getRequestData() : [],
                 'response_data' => method_exists($this, 'getResponseData') ? $this->getResponseData() : [],
+                // Moved out of tags to keep tag cardinality bounded (one
+                // value per server / IP shouldn't blow up Sentry's indexes).
+                'vhost_user'    => $vhostUser,
+                'ip_address'    => $external_ip,
+                'openssl_v'     => defined('OPENSSL_VERSION_TEXT') ? OPENSSL_VERSION_TEXT : 'NA',
+                'openssl_n'     => defined('OPENSSL_VERSION_NUMBER') ? OPENSSL_VERSION_NUMBER : 'NA',
             ]
         ];
+
+        // Top-level release/environment — required for Sentry to associate
+        // the event with a real release and an environment selector.
+        $errorData['release']     = self::$VERSION;
+        $errorData['environment'] = $this->getEnvironment();
+
+        // Volatile data (reseller, domain, IP, api_code, operation) lives as
+        // tags so it's filterable; the raw backend message is preserved in
+        // extra.original_message so no detail is lost.
+        $errorData['tags']                      = array_merge($errorData['tags'], $classification['tags']);
+        $errorData['extra']['original_message'] = $e->getMessage();
+        $errorData['fingerprint']               = $classification['fingerprint'];
 
         $sentry_auth = [
             'sentry_version=7',
@@ -336,7 +384,232 @@ trait SharedApiConfigAndUtilsTrait
         }
         $sentry_auth_header = 'X-Sentry-Auth: Sentry ' . implode(', ', $sentry_auth);
 
-        $this->fireAndForgetPost($api_url, json_encode($errorData), $sentry_auth_header);
+        $payload = $this->encodeSentryPayload($errorData);
+        if ($payload === '') {
+            return; // unencodable even after sanitising — drop rather than POST empty
+        }
+        $this->fireAndForgetPost($api_url, $payload, $sentry_auth_header);
+    }
+
+    /**
+     * JSON-encode a Sentry event payload defensively. request_data /
+     * response_data / original_message can carry invalid UTF-8 (a real
+     * failure mode — e.g. a binary SOAP body), which makes a plain
+     * json_encode() return false and silently drop the whole event exactly
+     * when an error occurred. Substitute bad bytes and tolerate partial
+     * output so the event still ships.
+     *
+     * @param array $data
+     * @return string JSON, or '' if it could not be encoded at all.
+     */
+    private function encodeSentryPayload(array $data): string
+    {
+        $flags = 0;
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $flags |= JSON_INVALID_UTF8_SUBSTITUTE; // PHP 7.2+
+        }
+        if (defined('JSON_PARTIAL_OUTPUT_ON_ERROR')) {
+            $flags |= JSON_PARTIAL_OUTPUT_ON_ERROR; // PHP 5.5+
+        }
+        $json = json_encode($data, $flags);
+        return is_string($json) ? $json : '';
+    }
+
+    /**
+     * Trace id shared by all telemetry this *client instance* emits, so the
+     * calls made through one client (e.g. check → register → sync) stitch
+     * into one Sentry trace. Deliberately instance-scoped, NOT static: a
+     * process-global would merge unrelated tenants/requests into a single
+     * trace under long-running workers (swoole/roadrunner/queue) or a CLI
+     * cron looping over many domains with separate client instances.
+     *
+     * @var string|null
+     */
+    private ?string $sessionTraceId = null;
+
+    /**
+     * Volatile data shared by both error events and transaction events:
+     * reseller (REST UUID / SOAP username), domain (from lastRequest),
+     * operation (lastFunction), api_code (from exception message regex or
+     * the exception's own numeric code). Lives as tags so Sentry filters
+     * like "reseller=X" or "api_code=API_500" cut across both event types.
+     *
+     * @param Exception|null $e
+     * @return array<string,string>
+     */
+    private function buildCommonTags(?Exception $e = null): array
+    {
+        $tags = [];
+
+        if (property_exists($this, 'resellerId') && !empty($this->resellerId)) {
+            $tags['reseller'] = (string) $this->resellerId;
+        } elseif (property_exists($this, 'serviceUsername') && !empty($this->serviceUsername)) {
+            $tags['reseller'] = (string) $this->serviceUsername;
+        }
+
+        $lr = (property_exists($this, 'lastRequest') && is_array($this->lastRequest))
+            ? $this->lastRequest : [];
+        $domain = $lr['payload']['domainName']
+               ?? $lr['request']['DomainName']
+               ?? null;
+        if (!empty($domain) && is_string($domain)) {
+            $tags['domain'] = $domain;
+        }
+
+        if (property_exists($this, 'lastFunction') && !empty($this->lastFunction)) {
+            $tags['operation'] = (string) $this->lastFunction;
+        }
+
+        if ($e !== null) {
+            $msg = (string) $e->getMessage();
+            if (preg_match('/API_(-?\d+)_ERROR/', $msg, $m)) {
+                $tags['api_code'] = 'API_' . $m[1];
+            } else {
+                $code = $e->getCode();
+                if (is_numeric($code) && (int) $code !== 0) {
+                    $tags['api_code'] = 'API_' . (int) $code;
+                }
+            }
+        }
+
+        return $tags;
+    }
+
+    /**
+     * Map success + api_code to an OTel-compatible trace status so Sentry's
+     * Performance "Failure Rate", alerts and queries work correctly. The
+     * legacy literal "error" was non-standard and would silently disable
+     * those widgets.
+     *
+     * @param bool $success
+     * @param string|null $apiCode like "API_500", "API_2302", "API_-1"
+     * @return string OTel status: ok / internal_error / unavailable / ...
+     */
+    private function mapTraceStatus(bool $success, ?string $apiCode): string
+    {
+        if ($success) {
+            return 'ok';
+        }
+        if ($apiCode === null) {
+            return 'unknown';
+        }
+        if (!preg_match('/-?\d+/', $apiCode, $m)) {
+            return 'unknown';
+        }
+        $code = (int) $m[0];
+        if ($code === 401 || $code === 2202) return 'unauthenticated';
+        if ($code === 403)                   return 'permission_denied';
+        if ($code === 404 || $code === 510)  return 'not_found';
+        if ($code === 408 || $code === 504)  return 'deadline_exceeded';
+        if ($code === -1)                    return 'unavailable';
+        if ($code >= 500 && $code < 600)     return 'internal_error';
+        if ($code >= 400 && $code < 500)     return 'invalid_argument';
+        return 'unknown';
+    }
+
+    /**
+     * Resolve the Sentry "environment" string from the configured service
+     * URL — OTE/test traffic should not be lumped into production metrics.
+     */
+    private function getEnvironment(): string
+    {
+        if (property_exists($this, 'serviceUrl') && is_string($this->serviceUrl)
+            && stripos($this->serviceUrl, 'ote.') !== false) {
+            return 'ote';
+        }
+        return 'production';
+    }
+
+    /**
+     * Lazily generate (once per client instance) the trace id used by every
+     * transaction this client emits. Lets Sentry stitch this client's
+     * `check → register → sync` into one waterfall, without merging other
+     * clients/tenants/requests that live in the same long-running process.
+     */
+    private function getSessionTraceId(): string
+    {
+        if ($this->sessionTraceId === null) {
+            $this->sessionTraceId = bin2hex(random_bytes(16));
+        }
+        return $this->sessionTraceId;
+    }
+
+    /**
+     * Build a stable Sentry classification from an exception.
+     *
+     * Returns:
+     *  - 'value'       : a normalised message — IP/domain/numbers/quoted
+     *                    strings replaced with placeholders so the same
+     *                    underlying error always renders the same title.
+     *  - 'tags'        : volatile data extracted into transport-agnostic
+     *                    tags (reseller, domain, operation, api_code, ip_value)
+     *                    so they remain filterable in Sentry.
+     *  - 'fingerprint' : ['dna', application, operation, normalised value] —
+     *                    explicit grouping key. Reseller is intentionally
+     *                    NOT in the fingerprint (would re-shatter groups).
+     *
+     * The raw backend message is preserved unchanged in
+     * extra.original_message at the call-site so no detail is lost.
+     *
+     * @param Exception $e
+     * @return array{value:string,tags:array<string,string>,fingerprint:array<int,string>}
+     */
+    private function buildSentryClassification(Exception $e): array
+    {
+        $msg  = (string) $e->getMessage();
+
+        // Reseller / domain / operation / api_code now live in the shared
+        // helper so error and transaction events agree on tag keys.
+        $tags = $this->buildCommonTags($e);
+
+        // ip_value is meaningful only when the error message itself names
+        // an IP (e.g. "Your current IP address (X) is not authorized") —
+        // not relevant for transactions, so kept here.
+        if (preg_match('/\b(\d{1,3}(?:\.\d{1,3}){3})\b/', $msg, $m)) {
+            $tags['ip_value'] = $m[1];
+        }
+
+        // Normalise the message: strip the variable bits so identical
+        // underlying errors render an identical title.
+        $apiCode = $tags['api_code'] ?? null;
+        $n = $msg;
+        $n = preg_replace('/^\[API_ERROR\]:\s*/i', '', $n);
+        $n = preg_replace('/API_-?\d+_ERROR\s*-\s*Failed\s*-\s*/i', '', $n);
+        $n = preg_replace('/\s*\(Reseller Id[^)]*\)\s*/i', '', $n);
+        $n = preg_replace('/\b\d{1,3}(?:\.\d{1,3}){3}\b/', '{ip}', $n);
+        $n = preg_replace("/'[^']{0,80}'|\"[^\"]{0,80}\"/", '{v}', $n);
+        // Replace runs of 2+ digits (single digits often carry meaning,
+        // e.g. "v4", "All 4 contact types required").
+        $n = preg_replace('/\b\d{2,}\b/', '{n}', $n);
+        $n = trim((string) preg_replace('/\s+/', ' ', (string) $n));
+
+        if ($n === '') {
+            // Empty backend message (e.g. HTTP 4xx/5xx with empty body):
+            // prefer the api_code alone as a clean, stable title; otherwise
+            // fall back to the exception class so the title is still useful.
+            if ($apiCode) {
+                $n = $apiCode;
+            } else {
+                $parts = explode('\\', get_class($e));
+                $n     = end($parts) ?: 'Exception';
+            }
+        } elseif ($apiCode && strpos($n, $apiCode) !== 0) {
+            $n = $apiCode . ': ' . $n;
+        }
+        if (strlen($n) > 160) {
+            $n = substr($n, 0, 157) . '...';
+        }
+
+        return [
+            'value'       => $n,
+            'tags'        => $tags,
+            'fingerprint' => [
+                'dna',
+                $this->application ?? 'CORE',
+                $tags['operation'] ?? 'unknown',
+                $n,
+            ],
+        ];
     }
 
     private function sendPerformanceMetricsToSentry(array $metrics): void
@@ -360,82 +633,102 @@ trait SharedApiConfigAndUtilsTrait
             $secret_key = $parsed_dsn['pass'] ?? null;
             $api_url = "https://$host/api/$project_id/store/";
 
-            $trace_id = bin2hex(random_bytes(16));
-            $span_id = bin2hex(random_bytes(8));
+            // Shared per-request trace id so multiple library calls in the
+            // same PHP request show up as one Sentry trace waterfall.
+            $trace_id        = $this->getSessionTraceId();
+            $root_span_id    = bin2hex(random_bytes(8));
+            $child_span_id   = bin2hex(random_bytes(8));
+
+            $isSoap = property_exists($this, 'service');
+            $op     = $isSoap ? 'soap.client' : 'http.client';
+
+            // OTel-compatible trace status (replaces the legacy "error"
+            // literal which Sentry's Performance widgets do not understand).
+            $apiCode = null;
+            if (property_exists($this, 'lastParsedResponse') && is_array($this->lastParsedResponse)
+                && isset($this->lastParsedResponse['Code']) && is_string($this->lastParsedResponse['Code'])) {
+                $apiCode = $this->lastParsedResponse['Code'];
+            } elseif (property_exists($this, 'lastResponse') && is_array($this->lastResponse)
+                && isset($this->lastResponse['error']['code']) && is_string($this->lastResponse['error']['code'])) {
+                $apiCode = $this->lastResponse['error']['code'];
+            }
+            $traceStatus = $this->mapTraceStatus((bool) $metrics['success'], $apiCode);
+
+            // Common cross-event tags (reseller, domain, operation, api_code).
+            $commonTags = $this->buildCommonTags();
+            if ($apiCode !== null && !isset($commonTags['api_code'])) {
+                $commonTags['api_code'] = (string) $apiCode;
+            }
 
             $vhostUser = '';
             try {
                 $vhostUser = function_exists('get_current_user') ? \get_current_user() : '';
             } catch (Exception $ex) {
-                 if (property_exists($this, 'errorReportingPath') && !empty($this->errorReportingPath) && preg_match('/\/home\/([^\/]+)\//', $this->errorReportingPath, $matches)) {
-                     $vhostUser = $matches[1];
-                 }
+                if (property_exists($this, 'errorReportingPath') && !empty($this->errorReportingPath)
+                    && preg_match('/\/home\/([^\/]+)\//', $this->errorReportingPath, $matches)) {
+                    $vhostUser = $matches[1];
+                }
             }
 
-            $openssl_version = defined('OPENSSL_VERSION_TEXT') ? OPENSSL_VERSION_TEXT : 'NA';
-            $environment = 'production'; // Consider making this configurable
-
             $performanceData = [
-                'event_id' => bin2hex(random_bytes(16)),
-                'timestamp' => $metrics['timestamp'],
-                'platform' => 'php',
-                'level' => 'info',
-                'type' => 'transaction',
-                'transaction' => "API.{$metrics['operation']}",
+                'event_id'         => bin2hex(random_bytes(16)),
+                'platform'         => 'php',
+                'level'            => 'info',
+                'type'             => 'transaction',
+                'transaction'      => "API.{$metrics['operation']}",
                 'transaction_info' => ['source' => 'custom'],
+                // Top-level release + environment — required for Sentry's
+                // Release Health and environment selector to work.
+                'release'          => self::$VERSION,
+                'environment'      => $this->getEnvironment(),
+                'timestamp'        => $metrics['timestamp'],
+                'start_timestamp'  => $metrics['start_timestamp'],
                 'contexts' => [
                     'trace' => [
                         'trace_id' => $trace_id,
-                        'span_id' => $span_id,
-                        'op' => property_exists($this, 'service') ? 'soap.client' : 'http.client', // Detect if SOAP or REST
-                        'status' => $metrics['success'] ? 'ok' : 'error',
-                    ],
-                    'performance' => [
-                        'duration_ms' => floatval($metrics['duration']),
-                        'samples_taken' => 1
+                        'span_id'  => $root_span_id,
+                        'op'       => $op,
+                        'status'   => $traceStatus,
                     ],
                     'runtime' => [
-                        'name' => 'php',
+                        'name'    => 'php',
                         'version' => PHP_VERSION,
-                        'openssl_version' => $openssl_version,
-                        'memory_limit' => ini_get('memory_limit'),
-                        'max_execution_time' => ini_get('max_execution_time')
                     ],
-                    'os' => [
-                        'name' => PHP_OS,
-                        'version' => php_uname('r'),
-                        'build' => php_uname('v')
-                    ],
-                    'device' => [
-                        'hostname' => gethostname() ?: 'unknown',
-                        'processor_count' => $this->detectProcessorCount()
-                    ]
                 ],
-                'tags' => [
-                    'release' => self::$VERSION,
-                    'environment' => $environment,
+                // Static/per-server bits (server_software, processor count,
+                // os build, extension flags…) were dropped — they don't
+                // change per request and were bloating every event.
+                'tags' => array_merge([
                     'application' => $this->application ?? 'UNKNOWN',
-                    'operation' => $metrics['operation'],
-                    'vhost_user' => $vhostUser,
-                    'ip_address' => $this->getServerIp(),
-                    'php_version' => PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION,
-                    'api_type' => property_exists($this, 'service') ? 'SOAP' : 'REST',
-                    'openssl_enabled' => extension_loaded('openssl') ? 'true' : 'false'
-                ],
+                    'api_type'    => $isSoap ? 'SOAP' : 'REST',
+                ], $commonTags),
                 'measurements' => [
                     'duration' => ['value' => floatval($metrics['duration']), 'unit' => 'millisecond'],
-                    'memory' => ['value' => memory_get_peak_usage(true), 'unit' => 'byte']
+                    'memory'   => ['value' => memory_get_peak_usage(true),    'unit' => 'byte'],
                 ],
                 'extra' => [
-                    'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'NA',
-                    'server_protocol' => $_SERVER['SERVER_PROTOCOL'] ?? 'NA',
-                    'request_time' => $_SERVER['REQUEST_TIME'] ?? time(),
-                    'timezone' => date_default_timezone_get(),
-                    'soap_enabled' => extension_loaded('soap') ? 'true' : 'false',
-                    'curl_enabled' => extension_loaded('curl') ? 'true' : 'false',
-                    'json_enabled' => extension_loaded('json') ? 'true' : 'false'
+                    // High-cardinality identifiers moved here from tags to
+                    // keep Sentry's tag indexes lean.
+                    'vhost_user' => $vhostUser,
+                    'ip_address' => $this->getServerIp(),
                 ],
-                'start_timestamp' => $metrics['start_timestamp']
+                // Stub child span: a single span covering the outgoing call
+                // so the Sentry waterfall shows the op type (http/soap.client)
+                // even before we instrument sub-call timing. When parseCall/
+                // request gain real internal timing this span will narrow
+                // to just the network portion.
+                'spans' => [
+                    [
+                        'span_id'         => $child_span_id,
+                        'parent_span_id'  => $root_span_id,
+                        'trace_id'        => $trace_id,
+                        'op'              => $op,
+                        'description'     => $metrics['operation'],
+                        'status'          => $traceStatus,
+                        'start_timestamp' => $metrics['start_timestamp'],
+                        'timestamp'       => $metrics['timestamp'],
+                    ],
+                ],
             ];
 
             $sentry_auth = [
@@ -448,9 +741,9 @@ trait SharedApiConfigAndUtilsTrait
             }
             $sentry_auth_header = 'X-Sentry-Auth: Sentry ' . implode(', ', $sentry_auth);
 
-            $this->fireAndForgetPost($api_url, json_encode($performanceData), $sentry_auth_header);
-        } catch (Exception $e) {
-            // Fail silently
+            $this->fireAndForgetPost($api_url, $this->encodeSentryPayload($performanceData), $sentry_auth_header);
+        } catch (\Throwable $e) {
+            // Fail silently — telemetry must never throw into the host app.
         }
     }
 
