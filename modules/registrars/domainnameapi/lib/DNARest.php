@@ -305,6 +305,7 @@ class DNARest
         if (curl_errno($ch)) {
             $error = new Exception('Curl error during request: ' . curl_error($ch));
             $this->sendErrorToSentryAsync($error);
+            curl_close($ch);
         } else {
             curl_close($ch);
 
@@ -312,17 +313,7 @@ class DNARest
             if ($response_status >= 200 && $response_status <= 299) {
                 $parsedResponse           = json_decode($response_body, true);
                 $this->lastParsedResponse = $parsedResponse;
-
-                if (method_exists($this, 'sendPerformanceMetricsToSentry')) {
-                    $duration = (microtime(true) - $this->startAt) * 1000;
-                    $this->sendPerformanceMetricsToSentry([
-                        'operation'       => $this->lastFunction,
-                        'duration'        => floatval($duration),
-                        'success'         => true,
-                        'timestamp'       => gmdate('Y-m-d\TH:i:s.', time()) . sprintf('%03d', round(fmod(microtime(true), 1) * 1000)) . 'Z',
-                        'start_timestamp' => gmdate('Y-m-d\TH:i:s.', (int)$this->startAt) . sprintf('%03d',  round(fmod($this->startAt, 1) * 1000)) . 'Z'
-                    ]);
-                }
+                $isSuccess                = true;
             } else {
                 $parsedResponse           = json_decode($response_body, true);
 
@@ -336,7 +327,30 @@ class DNARest
                 $errorDetails             = $parsedResponse['details'] ?? ($parsedResponse['error']['details'] ?? $response_body);
                 $this->lastParsedResponse = $this->setError($errorCode, $errorMessage, $errorDetails);
                 $error                    = new Exception($errorMessage, $response_status);
+                $isSuccess                = false;
+            }
 
+            // Smart sampling for performance metrics. Only SUCCESSFUL calls
+            // are sampled here: a failure already ships an error event (with
+            // the same operation/duration context), so emitting a perf
+            // transaction too would double the POSTs and the Sentry ingest —
+            // and would leak telemetry for ignored errors that the error
+            // channel deliberately suppresses. Slow successful calls (>1s)
+            // are always sampled, otherwise the configured random rate.
+            if ($isSuccess && method_exists($this, 'sendPerformanceMetricsToSentry')) {
+                $duration = (microtime(true) - $this->startAt) * 1000;
+                if ($duration > 1000 || (mt_rand(1, 1000) <= self::$PERFORMANCE_SAMPLE_RATE)) {
+                    $this->sendPerformanceMetricsToSentry([
+                        'operation'       => $this->lastFunction,
+                        'duration'        => floatval($duration),
+                        'success'         => true,
+                        'timestamp'       => gmdate('Y-m-d\TH:i:s.', time()) . sprintf('%03d', round(fmod(microtime(true), 1) * 1000)) . 'Z',
+                        'start_timestamp' => gmdate('Y-m-d\TH:i:s.', (int)$this->startAt) . sprintf('%03d', round(fmod($this->startAt, 1) * 1000)) . 'Z'
+                    ]);
+                }
+            }
+
+            if (!$isSuccess) {
                 $this->sendErrorToSentryAsync($error);
                 throw $error;
             }
@@ -405,36 +419,44 @@ class DNARest
      */
     public function getCurrentBalance($currencyId = 'USD')
     {
+        $currencyName = strtoupper($currencyId);
+
+        // SOAP uyumu: TRY → TL, currency ID'leri eşle
+        $currencyMap = [
+            'USD' => ['id' => 2, 'name' => 'USD', 'symbol' => '$'],
+            'TRY' => ['id' => 1, 'name' => 'TL',  'symbol' => 'TL'],
+            'EUR' => ['id' => 3, 'name' => 'EUR', 'symbol' => '€'],
+            'GBP' => ['id' => 4, 'name' => 'GBP', 'symbol' => '£'],
+        ];
+        $mapped = $currencyMap[$currencyName] ?? ['id' => 0, 'name' => $currencyName, 'symbol' => ''];
+
         try {
-            $response = $this->request('GET', 'deposit/accounts/me', ['currency' => strtoupper($currencyId)]);
+            $response = $this->request('GET', 'deposit/accounts/me', ['currency' => $currencyName]);
 
-            $balanceKey   = strtolower($currencyId) . 'Balance';
-            $currencyName = strtoupper($currencyId);
-
-            // SOAP uyumu: TRY → TL, currency ID'leri eşle
-            $currencyMap = [
-                'USD' => ['id' => 2, 'name' => 'USD', 'symbol' => '$'],
-                'TRY' => ['id' => 1, 'name' => 'TL',  'symbol' => 'TL'],
-                'EUR' => ['id' => 3, 'name' => 'EUR', 'symbol' => '€'],
-                'GBP' => ['id' => 4, 'name' => 'GBP', 'symbol' => '£'],
-            ];
-            $mapped = $currencyMap[$currencyName] ?? ['id' => 0, 'name' => $currencyName, 'symbol' => ''];
+            $balanceKey = strtolower($currencyId) . 'Balance';
 
             return [
                 'ErrorCode'        => 0,
                 'OperationMessage' => 'Command completed succesfully.',
                 'OperationResult'  => 'SUCCESS',
-                'Balance'          => number_format($response[$balanceKey] ?? 0, 2, '.', ''),
+                'Balance'          => number_format((float)($response[$balanceKey] ?? 0), 2, '.', ''),
                 'CurrencyId'       => $mapped['id'],
                 'CurrencyInfo'     => null,
                 'CurrencyName'     => $mapped['name'],
                 'CurrencySymbol'   => $mapped['symbol']
             ];
         } catch (Exception $e) {
+            // Keep the same envelope shape as the success path so callers can
+            // rely on a single schema (ErrorCode/OperationResult signal failure).
             return [
-                'result' => self::$RESULT_ERROR,
-                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'BALANCE', $e->getMessage(),
-                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+                'ErrorCode'        => $this->formatErrorCode($e->getCode()) ?: 'BALANCE',
+                'OperationMessage' => $e->getMessage(),
+                'OperationResult'  => 'FAILED',
+                'Balance'          => '0.00',
+                'CurrencyId'       => $mapped['id'],
+                'CurrencyInfo'     => null,
+                'CurrencyName'     => $mapped['name'],
+                'CurrencySymbol'   => $mapped['symbol']
             ];
         }
     }
@@ -1107,14 +1129,20 @@ class DNARest
                 $payloadContacts[] = $this->parseContact($details, ucfirst(strtolower($type)));
             }
 
+            // Gateway schema uses `tldAttributes` (object/dict), not the
+            // legacy `additionalAttributes` (array). Always send as an object
+            // — `{}` when empty, not `[]` — so it matches the OpenAPI schema
+            // and the backend's own canonical example.
             $payload = [
-                'domainName'           => $domainName,
-                'period'               => $period,
-                'nameServers'          => empty($nameServers) ? self::$DEFAULT_NAMESERVERS : $nameServers,
-                'isLocked'             => $eppLock,
-                'privacyEnabled'       => $privacyLock,
-                'contacts'             => $payloadContacts,
-                'additionalAttributes' => $additionalAttributes
+                'domainName'    => $domainName,
+                'period'        => $period,
+                'nameServers'   => empty($nameServers) ? self::$DEFAULT_NAMESERVERS : $nameServers,
+                'isLocked'      => $eppLock,
+                'privacyEnabled'=> $privacyLock,
+                'contacts'      => $payloadContacts,
+                'tldAttributes' => empty($additionalAttributes)
+                    ? new \stdClass()
+                    : (object) $additionalAttributes,
             ];
 
             $response = $this->request('POST', 'domains/register-with-contacts', $payload);
@@ -1221,7 +1249,15 @@ class DNARest
                 'Dates'                   => [
                     'Start'         => isset($data['startDate']) ? date('Y-m-d\TH:i:s', strtotime($data['startDate'])) : '',
                     'Expiration'    => isset($data['expirationDate']) ? date('Y-m-d\TH:i:s', strtotime($data['expirationDate'])) : '',
-                    'RemainingDays' => (int)($data['remainingDay'] ?? 0)
+                    // The register endpoint returns expirationDate but no
+                    // remainingDay; derive it from expirationDate so callers
+                    // still get a sane day count. getDetails (which does send
+                    // remainingDay) keeps using the server value.
+                    'RemainingDays' => isset($data['remainingDay'])
+                        ? (int)$data['remainingDay']
+                        : (isset($data['expirationDate'])
+                            ? max(0, (int)ceil((strtotime($data['expirationDate']) - time()) / 86400))
+                            : 0)
                 ],
                 'NameServers'             => isset($data['nameservers']) ? array_map('strval',
                     $data['nameservers']) : [],
@@ -1330,6 +1366,10 @@ class DNARest
             'phone'            => (string)$phone,
             'faxCountryCode'   => (string)$faxCc,
             'fax'              => (string)$fax,
+            // Required non-nullable bool in the gateway ContactLiteDto. The
+            // backend's own example payload includes it; omitting causes
+            // ModelState validation to reject the whole registration.
+            'isHidden'         => (bool)($contact['IsHidden'] ?? false),
         ];
     }
 

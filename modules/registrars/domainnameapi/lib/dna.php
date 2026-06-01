@@ -15,7 +15,7 @@
  *   - Normal username → DNASoap (SOAP API)
  *
  * @package DomainNameApi
- * @version 3.0.2
+ * @version 3.0.3
  */
 
 namespace DomainNameApi;
@@ -293,4 +293,14 @@ class DomainNameAPI_PHPLibrary
 
     public function validateContact($contact) { return $this->client->validateContact($contact); }
     public function isTrTLD($domain) { return $this->client->isTrTLD($domain); }
+
+    /**
+     * Facade-level override: the trait's version of this setter, when invoked
+     * on the facade, would route through __set into a private property on the
+     * client and fail. Delegate explicitly to the underlying transport.
+     */
+    public function setErrorReportingEnabled(bool $enabled): void
+    {
+        $this->client->setErrorReportingEnabled($enabled);
+    }
 }

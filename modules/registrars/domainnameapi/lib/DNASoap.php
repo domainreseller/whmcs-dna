@@ -96,6 +96,7 @@ class DNASoap
                 "encoding"           => "UTF-8",
                 'features'           => SOAP_SINGLE_ELEMENT_ARRAYS,
                 'exceptions'         => true,
+                'trace'              => true, // keep last response for diagnostics
                 'connection_timeout' => self::$DEFAULT_TIMEOUT,
                 'stream_context'     => $context
             ]);
@@ -452,7 +453,10 @@ class DNASoap
 
                 if (isset($data["DomainInfoList"]) && is_array($data["DomainInfoList"])) {
                     if (isset($data["DomainInfoList"]["DomainInfo"]["Id"])) {
-                        $result["data"]["Domains"][] = $data["DomainInfoList"]["DomainInfo"];
+                        // Single-domain accounts collapse the list; run it through
+                        // the same parser as the multi-domain branch so consumers
+                        // get a consistent shape regardless of domain count.
+                        $result["data"]["Domains"][] = $this->parseDomainInfo($data["DomainInfoList"]["DomainInfo"]);
                     } else {
                         // Parse multiple domain info
                         foreach ($data["DomainInfoList"]["DomainInfo"] as $domainInfo) {
@@ -1048,11 +1052,11 @@ class DNASoap
                     ]
                 ];
             } else {
+                $this->sendErrorToSentryAsync(new Exception("[DOMAIN_RENEW] " . self::$DEFAULT_ERRORS['DOMAIN_RENEW']['description']));
                 return [
                     'result' => self::$RESULT_ERROR,
                     'error'  => $this->setError("DOMAIN_RENEW")
                 ];
-                $this->sendErrorToSentryAsync(new Exception("[DOMAIN_RENEW] " . self::$DEFAULT_ERRORS['DOMAIN_RENEW']['description']));
             }
         });
 
@@ -1531,8 +1535,18 @@ class DNASoap
                 case "NameServerList":
 
                     if (is_array($attrValue)) {
+                        // SOAP wraps the list (e.g. ['NameServer' => ['ns1','ns2']]
+                        // or a bare string for a single NS). Flatten to a plain
+                        // list of strings so the shape matches DNARest.
+                        $result["NameServers"] = [];
                         foreach ($attrValue as $nameserverValue) {
-                            $result["NameServers"] = $nameserverValue;
+                            if (is_array($nameserverValue)) {
+                                foreach ($nameserverValue as $nsItem) {
+                                    $result["NameServers"][] = $nsItem;
+                                }
+                            } else {
+                                $result["NameServers"][] = $nameserverValue;
+                            }
                         }
                     }
                     break;
@@ -1660,22 +1674,21 @@ class DNASoap
         ];
 
         try {
-            // Sample performance metrics with 2.5% rate
-            $shouldSamplePerformance = (mt_rand(1, 1000) <= self::$PERFORMANCE_SAMPLE_RATE);
-
             $parameters["request"]["UserName"] = $this->serviceUsername;
             $parameters["request"]["Password"] = $this->servicePassword;
-            $_response = $this->service->__soapCall($fn, [$parameters]);
 
-            // Get the last response
-            $this->service->__getLastResponse();
-
-            // Convert response to array
-            $_response = $this->objectToArray($_response);
-
-            // Set function, request, and response data
+            // Record the request *before* the call: when __soapCall throws
+            // (connection refused, invalid-UTF-8 response, empty SoapFault)
+            // the catch blocks below still ship request context to Sentry
+            // instead of an empty 'extra'. DNARest::request() records eagerly
+            // for the same reason.
             $this->setLastFunction($fn);
             $this->setRequestData($parameters);
+
+            $_response = $this->service->__soapCall($fn, [$parameters]);
+
+            // Convert response to array and record it
+            $_response = $this->objectToArray($_response);
             $this->setResponseData($_response);
 
             // Check for errors in the response
@@ -1686,23 +1699,35 @@ class DNASoap
                 $result["error"]  = $this->parseError($_response);
             }
 
-            // Send performance metrics to Sentry
-            if ($shouldSamplePerformance) {
-                $duration = (microtime(true) - $this->startAt) * 1000;
+            // Smart sampling for performance metrics. Only SUCCESSFUL calls
+            // are sampled here: a failed call already ships an error event via
+            // parseError()/the catch blocks, so emitting a perf transaction
+            // too would double the POSTs and the Sentry ingest — and would
+            // leak telemetry for ignored errors the error channel suppresses.
+            // Slow successful calls (>1s) are always sampled, otherwise the
+            // configured random rate. (Callbacks may return a bare list with
+            // no 'result' key — guard the access.)
+            $duration = (microtime(true) - $this->startAt) * 1000;
+            $success  = (is_array($result) && ($result['result'] ?? null) === self::$RESULT_OK);
+            if ($success && ($duration > 1000 || (mt_rand(1, 1000) <= self::$PERFORMANCE_SAMPLE_RATE))) {
                 $this->sendPerformanceMetricsToSentry([
-                    'operation' => $fn,
-                    'duration'  => floatval($duration),
-                    'success'   => ($result['result'] === self::$RESULT_OK),
-                    'timestamp' => gmdate('Y-m-d\TH:i:s.', time()) . sprintf('%03d', round(fmod(microtime(true), 1) * 1000)) . 'Z',
+                    'operation'       => $fn,
+                    'duration'        => floatval($duration),
+                    'success'         => true,
+                    'timestamp'       => gmdate('Y-m-d\TH:i:s.', time()) . sprintf('%03d', round(fmod(microtime(true), 1) * 1000)) . 'Z',
                     'start_timestamp' => gmdate('Y-m-d\TH:i:s.', (int)$this->startAt) . sprintf('%03d', round(fmod($this->startAt, 1) * 1000)) . 'Z'
                 ]);
             }
 
         } catch (SoapFault $ex) {
+            // __soapCall threw before the response was recorded — capture the
+            // raw XML the client received so the Sentry event stays diagnosable.
+            $this->setResponseData(['raw_response' => $this->getRawSoapResponse()]);
             $result["result"] = self::$RESULT_ERROR;
             $result["error"]  = $this->setError('RESPONSE_SOAP', self::$DEFAULT_ERRORS['RESPONSE_SOAP']['description'], $ex->getMessage());
             $this->sendErrorToSentryAsync($ex);
         } catch (Exception $ex) {
+            $this->setResponseData(['raw_response' => $this->getRawSoapResponse()]);
             $result["result"] = self::$RESULT_ERROR;
             $result["error"]  = $this->parseError($this->objectToArray($ex));
             $this->sendErrorToSentryAsync($ex);
@@ -1712,6 +1737,36 @@ class DNASoap
         $this->setParsedResponseData($result);
 
         return $result;
+    }
+
+    /**
+     * Best-effort fetch of the raw last SOAP response for diagnostics.
+     * Returns '' when no response was received (e.g. connection failure).
+     * The result is guaranteed JSON-safe: a raw response can be invalid
+     * UTF-8 (a real failure mode), which would otherwise break json_encode
+     * of the whole Sentry event and lose the report entirely.
+     *
+     * @return string
+     */
+    private function getRawSoapResponse(): string
+    {
+        try {
+            if (!$this->service instanceof SoapClient) {
+                return '';
+            }
+            $raw = (string) ($this->service->__getLastResponse() ?? '');
+            if (strlen($raw) > 8192) {
+                $raw = substr($raw, 0, 8192) . '…[truncated]';
+            }
+            if (json_encode($raw) === false) {
+                $raw = function_exists('mb_convert_encoding')
+                    ? mb_convert_encoding($raw, 'UTF-8', 'UTF-8')
+                    : '[non-UTF-8 SOAP response, ' . strlen($raw) . ' bytes]';
+            }
+            return $raw;
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     /**
