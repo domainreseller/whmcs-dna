@@ -9,7 +9,7 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '3.0.3'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
+    public static $VERSION = '3.0.4'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
 
     public static $PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
     public static $RESULT_OK      = 'OK';
@@ -349,14 +349,12 @@ trait SharedApiConfigAndUtilsTrait
                 'elapsed_time'    => number_format($elapsed_time, 4),
                 'application'     => $this->application ?? 'UNKNOWN',
                 'extension_soap'  => extension_loaded('soap') ? 'enabled' : 'disabled',
+                'ip_address'      => $external_ip,
+                'vhost_user'      => $vhostUser,
             ],
             'extra'     => [
                 'request_data'  => method_exists($this, 'getRequestData') ? $this->getRequestData() : [],
                 'response_data' => method_exists($this, 'getResponseData') ? $this->getResponseData() : [],
-                // Moved out of tags to keep tag cardinality bounded (one
-                // value per server / IP shouldn't blow up Sentry's indexes).
-                'vhost_user'    => $vhostUser,
-                'ip_address'    => $external_ip,
                 'openssl_v'     => defined('OPENSSL_VERSION_TEXT') ? OPENSSL_VERSION_TEXT : 'NA',
                 'openssl_n'     => defined('OPENSSL_VERSION_NUMBER') ? OPENSSL_VERSION_NUMBER : 'NA',
             ]
@@ -460,6 +458,9 @@ trait SharedApiConfigAndUtilsTrait
             $tags['operation'] = (string) $this->lastFunction;
         }
 
+        // Transport: DNASoap has a $service (SoapClient), DNARest does not.
+        $tags['api_type'] = property_exists($this, 'service') ? 'SOAP' : 'REST';
+
         if ($e !== null) {
             $msg = (string) $e->getMessage();
             if (preg_match('/API_(-?\d+)_ERROR/', $msg, $m)) {
@@ -469,6 +470,11 @@ trait SharedApiConfigAndUtilsTrait
                 if (is_numeric($code) && (int) $code !== 0) {
                     $tags['api_code'] = 'API_' . (int) $code;
                 }
+            }
+            // Raw HTTP/response status code as its own filterable tag.
+            $rawCode = $e->getCode();
+            if (is_numeric($rawCode) && (int) $rawCode !== 0) {
+                $tags['status_code'] = (string) (int) $rawCode;
             }
         }
 
@@ -654,10 +660,16 @@ trait SharedApiConfigAndUtilsTrait
             }
             $traceStatus = $this->mapTraceStatus((bool) $metrics['success'], $apiCode);
 
-            // Common cross-event tags (reseller, domain, operation, api_code).
+            // Common cross-event tags (reseller, domain, operation, api_type).
             $commonTags = $this->buildCommonTags();
             if ($apiCode !== null && !isset($commonTags['api_code'])) {
                 $commonTags['api_code'] = (string) $apiCode;
+            }
+            // HTTP status code for REST (curl_getinfo http_code) so the perf
+            // transaction is filterable by status alongside the error events.
+            if (property_exists($this, 'lastResponseHeaders') && is_array($this->lastResponseHeaders)
+                && isset($this->lastResponseHeaders['http_code']) && (int) $this->lastResponseHeaders['http_code'] !== 0) {
+                $commonTags['status_code'] = (string) (int) $this->lastResponseHeaders['http_code'];
             }
 
             $vhostUser = '';
@@ -698,19 +710,16 @@ trait SharedApiConfigAndUtilsTrait
                 // Static/per-server bits (server_software, processor count,
                 // os build, extension flags…) were dropped — they don't
                 // change per request and were bloating every event.
+                // api_type comes from $commonTags now; ip_address/vhost_user
+                // are surfaced as tags so they're filterable in Performance.
                 'tags' => array_merge([
                     'application' => $this->application ?? 'UNKNOWN',
-                    'api_type'    => $isSoap ? 'SOAP' : 'REST',
+                    'ip_address'  => $this->getServerIp(),
+                    'vhost_user'  => $vhostUser,
                 ], $commonTags),
                 'measurements' => [
                     'duration' => ['value' => floatval($metrics['duration']), 'unit' => 'millisecond'],
                     'memory'   => ['value' => memory_get_peak_usage(true),    'unit' => 'byte'],
-                ],
-                'extra' => [
-                    // High-cardinality identifiers moved here from tags to
-                    // keep Sentry's tag indexes lean.
-                    'vhost_user' => $vhostUser,
-                    'ip_address' => $this->getServerIp(),
                 ],
                 // Stub child span: a single span covering the outgoing call
                 // so the Sentry waterfall shows the op type (http/soap.client)
