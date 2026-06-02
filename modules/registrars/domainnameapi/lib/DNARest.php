@@ -1129,6 +1129,20 @@ class DNARest
                 $payloadContacts[] = $this->parseContact($details, ucfirst(strtolower($type)));
             }
 
+            // Strip empty entries first, THEN fall back to defaults — a list
+            // like ["", ""] is non-empty but yields zero valid NS, which the
+            // gateway rejects with API_560. (Parity with DNASoap::register.)
+            if (is_array($nameServers)) {
+                $nameServers = array_values(array_filter($nameServers, function ($ns) {
+                    return is_string($ns) && strlen($ns) > 0;
+                }));
+            } else {
+                $nameServers = [];
+            }
+            if (empty($nameServers)) {
+                $nameServers = self::$DEFAULT_NAMESERVERS;
+            }
+
             // Gateway schema uses `tldAttributes` (object/dict), not the
             // legacy `additionalAttributes` (array). Always send as an object
             // — `{}` when empty, not `[]` — so it matches the OpenAPI schema
@@ -1136,7 +1150,7 @@ class DNARest
             $payload = [
                 'domainName'    => $domainName,
                 'period'        => $period,
-                'nameServers'   => empty($nameServers) ? self::$DEFAULT_NAMESERVERS : $nameServers,
+                'nameServers'   => $nameServers,
                 'isLocked'      => $eppLock,
                 'privacyEnabled'=> $privacyLock,
                 'contacts'      => $payloadContacts,

@@ -1086,17 +1086,24 @@ class DNASoap
         $privacyLock = false,
         $addionalAttributes = []
     ) {
+        // BUG-5337: Remove empty nameservers FIRST. The default-fallback must
+        // come AFTER cleaning — otherwise a list like ["", ""] is non-empty
+        // here, skips the default, then gets emptied below, leaving zero NS
+        // and an API_560 "must have 2 to 14 name servers" registry rejection.
+        if (is_array($nameServers)) {
+            foreach ($nameServers as $k => $v) {
+                if (!is_string($v) || strlen($v) < 1) {
+                    unset($nameServers[$k]);
+                }
+            }
+            $nameServers = array_values($nameServers);
+        } else {
+            $nameServers = [];
+        }
+
         if (empty($nameServers)) {
             $nameServers = self::$DEFAULT_NAMESERVERS;
         }
-
-        // BUG-5337: Remove empty nameservers
-        foreach ($nameServers as $k => $v) {
-            if (strlen($v) < 1) {
-                unset($nameServers[$k]);
-            }
-        }
-        $nameServers = array_values($nameServers);
 
 
         $parameters = [

@@ -9,7 +9,7 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '3.0.4'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
+    public static $VERSION = '3.0.5'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
 
     public static $PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
     public static $RESULT_OK      = 'OK';
@@ -30,6 +30,20 @@ trait SharedApiConfigAndUtilsTrait
         'Price definition not found',
         'TLD is not supported',
         'Invalid API credentials',
+        // REST gateway phrases its "domain not found" differently than the
+        // legacy 'Domain not found' string above; without this the message
+        // slips past the filter (e.g. WISECP sync of registry-absent domains
+        // produced 1100+ events/week). Matches code Dna.DomainService:Domain:10007.
+        'could not be found',
+        // Expected business outcomes — caller/registry state, not library or
+        // backend defects. Suppressed so real signal isn't buried.
+        'already exists in the registry', // API_2302 object exists
+        'Request already sent',           // API_2306 duplicate request
+        'Parameter value policy error',   // API_2306 duplicate/policy
+        'Premium domain is not available',// API_362 premium not registerable
+        'Contact not found',              // API_410
+        'Object does not exist',          // API_2303
+        'Authorization problem',          // API_2200 reseller auth state
     ];
 
     public static $DEFAULT_ERRORS = [
