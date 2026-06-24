@@ -54,7 +54,7 @@ function domainnameapi_getConfigArray($params) {
             $testmode = $params["API_TestMode"];
 
 
-            $addionalMessage = "Don't have an Domain Name API account yet? Get one here: <a href='https://www.domainnameapi.com/become-a-reseller' target='_blank'>https://www.domainnameapi.com/become-a-reseller</a>";
+            $addionalMessage = "Don't have a Domain Name API account yet? Get one here: <a href='https://www.domainnameapi.com/become-a-reseller' target='_blank'>https://www.domainnameapi.com/become-a-reseller</a>";
             $sysMsg = domainnameapi_parse_cache('user_'.$username.md5($password).$testmode, 100, function () use ($dna) {
 
                 $details = $dna->GetResellerDetails();
@@ -114,25 +114,25 @@ function domainnameapi_getConfigArray($params) {
                 "Description"  => "Check for using test platform!"
             ],
             'TrIdendity'   => [
-                'FriendlyName' => 'Turkish Identity',
+                'FriendlyName' => 'Turkish Identity Number',
                 'Type'         => 'dropdown',
                 'Options'      => $customfields,
-                'Description'  => 'Turkish Identity Custom Field , required only .tr tld',
+                'Description'  => 'Turkish Identity Number Custom Field, required only for .tr TLD',
             ],
             'TrTaxOffice'  => [
                 'FriendlyName' => 'Turkish Tax Office',
                 'Type'         => 'dropdown',
                 'Options'      => $customfields,
-                'Description'  => 'Turkish Tax Office Custom Field , required only .tr tld',
+                'Description'  => 'Turkish Tax Office Custom Field, required only for .tr TLD',
             ],
             'TrTaxNumber'  => [
-                'FriendlyName' => 'Turkish TaxNumber',
+                'FriendlyName' => 'Turkish Tax Identification Number',
                 'Type'         => 'dropdown',
                 'Options'      => $customfields,
-                'Description'  => 'Turkish TaxNumber Custom Field , required only .tr tld',
+                'Description'  => 'Turkish Tax Identification Number Custom Field, required only for .tr TLD',
             ],
             'basecurrency' => [
-                'FriendlyName' => 'Exchange Convertion For TLD Sync',
+                'FriendlyName' => 'Exchange Conversion for TLD Sync',
                 'Type'         => 'dropdown',
                 'Options'      => [
                     'no'  => 'Do Not Convert',
@@ -144,7 +144,7 @@ function domainnameapi_getConfigArray($params) {
                     'CNY' => 'to CNY',
                     'AED' => 'to AED',
                 ],
-                'Description'  => 'Base Currency Convertion. <br><b>Strongly advice to not use this feature</b>. Using this feature means that you have read and fully understood the  <a href="https://github.com/domainreseller/whmcs-dna/blob/main/DISCLAIMER.md" target="_blank">DISCLAIMER AND WAIVER OF LIABILITY</a>'
+                'Description'  => 'Base Currency Conversion. <br><b>Strongly advice to not use this feature</b>. Using this feature means that you have read and fully understood the  <a href="https://github.com/domainreseller/whmcs-dna/blob/main/DISCLAIMER.md" target="_blank">DISCLAIMER AND WAIVER OF LIABILITY</a>'
             ],
             'AI_Suggestion' => [
                 'FriendlyName' => 'AI Domain Suggestions',
