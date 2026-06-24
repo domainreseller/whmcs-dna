@@ -9,7 +9,7 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '3.0.5'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
+    public static $VERSION = '3.0.6'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
 
     public static $PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
     public static $RESULT_OK      = 'OK';
@@ -30,20 +30,21 @@ trait SharedApiConfigAndUtilsTrait
         'Price definition not found',
         'TLD is not supported',
         'Invalid API credentials',
-        // REST gateway phrases its "domain not found" differently than the
-        // legacy 'Domain not found' string above; without this the message
-        // slips past the filter (e.g. WISECP sync of registry-absent domains
-        // produced 1100+ events/week). Matches code Dna.DomainService:Domain:10007.
-        'could not be found',
-        // Expected business outcomes — caller/registry state, not library or
-        // backend defects. Suppressed so real signal isn't buried.
-        'already exists in the registry', // API_2302 object exists
-        'Request already sent',           // API_2306 duplicate request
-        'Parameter value policy error',   // API_2306 duplicate/policy
-        'Premium domain is not available',// API_362 premium not registerable
-        'Contact not found',              // API_410
-        'Object does not exist',          // API_2303
-        'Authorization problem',          // API_2200 reseller auth state
+        // 'could not be found',-
+        // 'already exists in the registry', // API_2302 object exists
+        // 'Request already sent',           // API_2306 duplicate request
+        // 'Parameter value policy error',   // API_2306 duplicate/policy
+        // 'Premium domain is not available',// API_362 premium not registerable
+        // 'Contact not found',              // API_410
+        // 'Object does not exist',          // API_2303
+        // 'Authorization problem',          // API_2200 reseller auth state
+        // 'is not authorized to access',       // API_0  caller IP not whitelisted
+        // 'clientTransferProhibited is not set',// API_2004 transfer lock absent on domain
+        // 'Transfer lock exists',               // API_592 transfer lock present on domain
+        // 'Domain transfer is not permitted',   // API_403 registry forbids transfer
+        // 'auto-renewal period',                // API_363 op cancelled in auto-renewal window
+        // 'Invalid zip code',                   // API_2306 contact zip validation
+        // 'Subordinate host info not available',// API_561 partial host info on register
     ];
 
     public static $DEFAULT_ERRORS = [
@@ -686,6 +687,41 @@ trait SharedApiConfigAndUtilsTrait
                 $commonTags['status_code'] = (string) (int) $this->lastResponseHeaders['http_code'];
             }
 
+            // Outbound-call span attributes. Sentry's "Outbound API Requests"
+            // module attributes a call to a domain by parsing the span
+            // description ("METHOD https://host") and reads the status from
+            // span.data — without these the dashboard shows "Unknown Domain"
+            // and "(no value)" response codes.
+            $httpMethod = $isSoap ? 'POST' : 'GET';
+            if (property_exists($this, 'lastRequest') && is_array($this->lastRequest)
+                && !empty($this->lastRequest['method'])) {
+                $httpMethod = (string) $this->lastRequest['method'];
+            }
+            $callHost = '';
+            $callUrl  = '';
+            if (property_exists($this, 'lastRequest') && is_array($this->lastRequest)
+                && !empty($this->lastRequest['url'])) {
+                $callUrl  = (string) $this->lastRequest['url']; // REST: full URL recorded
+                $callHost = (string) (parse_url($callUrl, PHP_URL_HOST) ?: '');
+            } elseif (property_exists($this, 'serviceUrl') && is_string($this->serviceUrl)) {
+                $callHost = (string) (parse_url($this->serviceUrl, PHP_URL_HOST) ?: ''); // SOAP: gateway host
+            }
+
+            $spanData = ['http.request.method' => $httpMethod];
+            if ($callHost !== '') {
+                $spanData['server.address'] = $callHost;
+            }
+            if ($callUrl !== '') {
+                $spanData['url.full'] = $callUrl;
+            }
+            if (isset($commonTags['status_code'])) {
+                $spanData['http.response.status_code'] = (int) $commonTags['status_code'];
+            }
+            // Sentry parses the outbound domain from this description shape.
+            $spanDescription = $callHost !== ''
+                ? $httpMethod . ' https://' . $callHost
+                : (string) $metrics['operation'];
+
             $vhostUser = '';
             try {
                 $vhostUser = function_exists('get_current_user') ? \get_current_user() : '';
@@ -746,8 +782,9 @@ trait SharedApiConfigAndUtilsTrait
                         'parent_span_id'  => $root_span_id,
                         'trace_id'        => $trace_id,
                         'op'              => $op,
-                        'description'     => $metrics['operation'],
+                        'description'     => $spanDescription,
                         'status'          => $traceStatus,
+                        'data'            => $spanData,
                         'start_timestamp' => $metrics['start_timestamp'],
                         'timestamp'       => $metrics['timestamp'],
                     ],

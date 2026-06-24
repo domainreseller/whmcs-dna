@@ -49,6 +49,39 @@ class DNARest
     public const URL_PROD = "https://api.domainresellerapi.com/api/v1";
     public const URL_OTE  = "https://ote.domainresellerapi.com/api/v1";
 
+    /**
+     * Gateway DomainStatus enum (byte) → textual label.
+     *
+     * The domain listing endpoint returns the numeric enum in `status` and the
+     * textual label in `statusCode`; some responses may still deliver the
+     * numeric value only. This map lets us recover the SOAP-style label that
+     * callers compare against (e.g. "Active"). Source: gateway DomainStatus enum.
+     */
+    private const DOMAIN_STATUS_MAP = [
+        0  => 'Active',
+        1  => 'WaitingForRegistration',
+        2  => 'WaitingForDocument',
+        3  => 'WaitingForIncomingTransfer',
+        4  => 'TransferredOut',
+        7  => 'PendingDelete',
+        8  => 'Deleted',
+        9  => 'ConfirmationEmailSend',
+        11 => 'WaitingForOutgoingTransfer',
+        12 => 'PendingHold',
+        15 => 'ModificationPending',
+        18 => 'InCase',
+        19 => 'PendingRestore',
+    ];
+
+    /**
+     * Gateway DomainRenewalMode enum (byte) → textual label.
+     */
+    private const DOMAIN_RENEWAL_MODE_MAP = [
+        1 => 'AutoRenew',
+        2 => 'AutoExpire',
+        3 => 'AutoDelete',
+    ];
+
     private string $serviceUrl          = self::URL_PROD;
     private string $application         = "CORE";
     public array   $lastRequest         = [];
@@ -540,7 +573,15 @@ class DNARest
                     'Domains'    => isset($response['items']) ? array_map(function ($item) {
                         return [
                             'ID'                      => (int)($item['id'] ?? 0),
-                            'Status'                  => (string)($item['statusText'] ?? ($item['status'] ?? '')),
+                            // The listing endpoint puts the textual label in
+                            // `statusCode` and the numeric enum in `status`
+                            // (the reverse of domains/info). Prefer the label,
+                            // then legacy `statusText`, then resolve the enum.
+                            'Status'                  => (isset($item['statusCode']) && $item['statusCode'] !== '' && !is_numeric($item['statusCode']))
+                                ? (string)$item['statusCode']
+                                : (isset($item['statusText']) && $item['statusText'] !== '' && !is_numeric($item['statusText'])
+                                    ? (string)$item['statusText']
+                                    : $this->normalizeDomainStatus($item['status'] ?? '')),
                             'DomainName'              => $item['domainName'] ?? '',
                             'AuthCode'                => $item['authCode'] ?? '',
                             'LockStatus'              => !empty($item['lockStatus']) ? 'true' : 'false',
@@ -1241,6 +1282,26 @@ class DNARest
     }
 
     /**
+     * Normalize a gateway domain status to its textual label.
+     *
+     * Accepts either the numeric DomainStatus enum (e.g. 0) or a label string
+     * (e.g. "Active"). Numeric values are resolved via DOMAIN_STATUS_MAP;
+     * unknown numerics fall through as their string form, and label strings
+     * are returned untouched. This keeps SOAP/REST parity for callers that
+     * compare against "Active".
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function normalizeDomainStatus($value): string
+    {
+        if (is_numeric($value)) {
+            return self::DOMAIN_STATUS_MAP[(int)$value] ?? (string)$value;
+        }
+        return (string)$value;
+    }
+
+    /**
      * Parse domain information from response
      * @param array $data
      * @return array
@@ -1253,7 +1314,10 @@ class DNARest
         return [
             'data'   => [
                 'ID'                      => (int)($data['id'] ?? 0),
-                'Status'                  => (string)($data['status'] ?? ''),
+                // domains/info delivers the label in `status` (statusCode here
+                // carries the EPP code, not the lifecycle status). Normalize so
+                // a future switch to the numeric enum keeps working.
+                'Status'                  => $this->normalizeDomainStatus($data['status'] ?? ''),
                 'DomainName'              => (string)($data['domainName'] ?? ($data['name'] ?? '')),
                 'AuthCode'                => (string)($data['authCode'] ?? ($data['eppCode'] ?? '')),
                 'LockStatus'              => !empty($data['lockStatus']) ? 'true' : 'false',
