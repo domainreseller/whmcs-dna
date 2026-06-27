@@ -279,7 +279,7 @@ class DNASoap
     {
         $parameters = [
             "request" => [
-                'CurrencyId' => self::$CURRENCIES['USD']['id'] // Varsayılan USD
+                'CurrencyId' => self::$CURRENCIES['USD']['id'] // Default USD
             ]
         ];
 
@@ -337,11 +337,11 @@ class DNASoap
         $currencyId = strtoupper($currencyId);
 
         // Para birimi ID'sini bul
-        $currency = self::$CURRENCIES['USD']; // Varsayılan USD
+        $currency = self::$CURRENCIES['USD']; // Default USD
         if (isset(self::$CURRENCIES[$currencyId])) {
             $currency = self::$CURRENCIES[$currencyId];
         } elseif ($currencyId === '1' || $currencyId === '2') {
-            // Eski ID tabanlı kullanım için geriye dönük uyumluluk
+            // Backward compatibility for legacy ID-based usage
             foreach (self::$CURRENCIES as $curr) {
                 if ($curr['id'] == $currencyId) {
                     $currency = $curr;
@@ -1653,7 +1653,7 @@ class DNASoap
             "Additional" => [],
         ];
 
-        // AdditionalAttributes kontrolü
+        // AdditionalAttributes check
         if (isset($data["AdditionalAttributes"]["KeyValueOfstringstring"]) && is_array($data["AdditionalAttributes"]["KeyValueOfstringstring"])) {
             foreach ($data["AdditionalAttributes"]["KeyValueOfstringstring"] as $attribute) {
                 if (isset($attribute["Key"]) && isset($attribute["Value"])) {
@@ -1784,7 +1784,7 @@ class DNASoap
      */
     public function validateContact($contact)
     {
-        // Varsayılan değerleri tanımla
+        // Define default values
         $defaults = [
             "FirstName"        => "Isimyok",
             "LastName"         => "Isimyok",
@@ -1796,14 +1796,14 @@ class DNASoap
             "PhoneCountryCode" => "90"
         ];
 
-        // Eksik anahtarları varsayılan değerlerle doldur
+        // Fill missing keys with default values
         foreach ($defaults as $key => $value) {
             if (!isset($contact[$key])) {
                 $contact[$key] = $value;
             }
         }
 
-        // Boş değerleri kontrol et ve varsayılan değerlerle doldur
+        // Check empty values and fill with defaults
         if (strlen(trim($contact["FirstName"])) == 0) {
             $contact["FirstName"] = $defaults["FirstName"];
         }
@@ -1823,7 +1823,7 @@ class DNASoap
             $contact["ZipCode"] = $defaults["ZipCode"];
         }
 
-        // Telefon numarası işleme
+        // Phone number processing
         $tmpPhone = isset($contact["Phone"]) ? preg_replace('/[^0-9]/', '', $contact["Phone"]) : '';
         if (strlen($tmpPhone) == 10) {
             $contact["PhoneCountryCode"] = '';

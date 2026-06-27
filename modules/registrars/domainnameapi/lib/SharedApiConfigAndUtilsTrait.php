@@ -9,9 +9,9 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '3.0.6'; // Bu değer her iki sınıfta da aynı olmalı, gerekirse güncellenmeli
+    public static $VERSION = '3.0.7'; // Must be identical in both classes; update here if changed
 
-    public static $PERFORMANCE_SAMPLE_RATE = 25; // 2.5% (25 out of 1000)
+    public static $PERFORMANCE_SAMPLE_RATE = 40; // 2.5% (25 out of 1000)
     public static $RESULT_OK      = 'OK';
     public static $RESULT_ERROR   = 'ERROR';
     public static $RESULT_SUCCESS = 'SUCCESS';
@@ -30,7 +30,8 @@ trait SharedApiConfigAndUtilsTrait
         'Price definition not found',
         'TLD is not supported',
         'Invalid API credentials',
-        // 'could not be found',-
+        'could not be found', // API_404 "The domain name you requested could not be found" — high-volume expected noise
+        'Insufficent reseller balance', // insufficient balance
         // 'already exists in the registry', // API_2302 object exists
         // 'Request already sent',           // API_2306 duplicate request
         // 'Parameter value policy error',   // API_2306 duplicate/policy
