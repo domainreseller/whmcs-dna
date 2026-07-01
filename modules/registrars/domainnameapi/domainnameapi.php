@@ -63,6 +63,24 @@ function domainnameapi_getConfigArray($params) {
 
                 if ($details['result'] != 'OK') {
                      $sysMsg = "<b>Username and password combination not correct</b>";
+
+                     if (!empty($details['error'])) {
+                         $err        = $details['error'];
+                         $errParts   = [];
+                         if (!empty($err['Code']))    { $errParts[] = "Code: <b>{$err['Code']}</b>"; }
+                         if (!empty($err['Message'])) { $errParts[] = "Message: <b>{$err['Message']}</b>"; }
+                         if (!empty($err['Details']) && $err['Details'] !== ($err['Message'] ?? '')) {
+                             $errParts[] = "Details: {$err['Details']}";
+                         }
+                         if ($errParts) {
+                             $sysMsg .= "<br><span style='color:#c0392b'>" . implode(' | ', $errParts) . "</span>";
+                         }
+                     }
+
+                     $sysMsg .= " | V.".domainnameapi_version();
+
+                     // Don't cache credential/API errors so the next save retries.
+                     return ['__dna_nocache' => $sysMsg];
                 } else {
                     $balances = [];
                      $sysMsg = "User: <b>{$details['name']}({$details['id']})</b> , Balance: ";
@@ -70,6 +88,8 @@ function domainnameapi_getConfigArray($params) {
                         $balances[]= "<b>{$v['balance']}{$v['symbol']}</b>";
                      }
                     $sysMsg .= implode(' | ', $balances);
+
+                    $sysMsg.= " | V.".domainnameapi_version();
                     $addionalMessage='';
 
                 }
@@ -1398,6 +1418,13 @@ function domainnameapi_parse_cache($key,$ttl,$callback){
     if (strtotime($token_row->updated_at) < (time() - 600)) {
 
         $data = $callback();
+
+        // Callbacks can opt out of caching for transient states (e.g. an API
+        // error) by returning ['__dna_nocache' => $value]. We hand back the
+        // value but leave the cache untouched so the next call retries.
+        if (is_array($data) && array_key_exists('__dna_nocache', $data)) {
+            return $data['__dna_nocache'];
+        }
 
         Capsule::table('tblconfiguration')
                ->where('setting', $cache_key)
