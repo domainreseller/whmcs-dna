@@ -260,6 +260,73 @@ class DNARest
         return (string)$code;
     }
 
+    /**
+     * Standard reason phrase for an HTTP status code. Used to build a legible
+     * fallback message when the gateway returns an error status with an empty
+     * body (e.g. 429 -> "Too Many Requests" instead of a generic "empty
+     * response"). Falls back to a class-based label for unknown codes.
+     */
+    private function httpStatusReason($status): string
+    {
+        $reasons = [
+            400 => 'Bad Request',
+            401 => 'Unauthorized',
+            402 => 'Payment Required',
+            403 => 'Forbidden',
+            404 => 'Not Found',
+            405 => 'Method Not Allowed',
+            408 => 'Request Timeout',
+            409 => 'Conflict',
+            422 => 'Unprocessable Entity',
+            429 => 'Too Many Requests',
+            500 => 'Internal Server Error',
+            502 => 'Bad Gateway',
+            503 => 'Service Unavailable',
+            504 => 'Gateway Timeout',
+        ];
+        $status = (int) $status;
+        if (isset($reasons[$status])) {
+            return $reasons[$status];
+        }
+        if ($status >= 500) return 'Server Error';
+        if ($status >= 400) return 'Client Error';
+        return 'Unexpected Response';
+    }
+
+    /**
+     * Format an API-supplied date to 'Y-m-d\TH:i:s', returning '' when the
+     * value is missing OR unparseable. Without the strtotime() !== false
+     * guard, an unexpected/MinValue date from the (.NET) gateway makes
+     * strtotime() return false, which date() then coerces to epoch and emits
+     * a bogus "1970-01-01T00:00:00" — silently corrupting domain expiry/next-due
+     * dates in the host billing system.
+     */
+    private function formatApiDate($value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+        $ts = strtotime((string) $value);
+        return $ts === false ? '' : date('Y-m-d\TH:i:s', $ts);
+    }
+
+    /**
+     * Remaining days until an API-supplied date, floored at 0. Returns 0 when
+     * the date is missing or unparseable (see formatApiDate() for why the
+     * strtotime() guard matters).
+     */
+    private function remainingDaysFromDate($value): int
+    {
+        if ($value === null || $value === '') {
+            return 0;
+        }
+        $ts = strtotime((string) $value);
+        if ($ts === false) {
+            return 0;
+        }
+        return max(0, (int) ceil(($ts - time()) / 86400));
+    }
+
     private function get(string $url, array $params = [])
     {
         return $this->request('GET', $url, $params);
@@ -336,10 +403,22 @@ class DNARest
         // Debug output removed to avoid breaking consumers
 
         if (curl_errno($ch)) {
-            $error = new Exception('Curl error during request: ' . curl_error($ch));
-            $this->sendErrorToSentryAsync($error);
+            // Transport failure (timeout, "Could not resolve host", reset).
+            // Do NOT throw: surface it the same way a bad/empty HTTP response
+            // does. Populate lastParsedResponse via setError() (mirroring the
+            // HTTP-error branch) and leave the body empty, so the caller's
+            // normal empty-response handling turns it into a RESULT_ERROR
+            // instead of an uncaught exception. Still reported to Sentry.
+            $curlErrno    = curl_errno($ch);
+            $errorMessage = 'Curl error during request: ' . curl_error($ch);
             curl_close($ch);
-        } else {
+
+            $this->lastParsedResponse = $this->setError('CURL_' . $curlErrno, $errorMessage, $errorMessage);
+            $this->sendErrorToSentryAsync(new Exception($errorMessage, $curlErrno));
+            // $parsedResponse stays [] — consumers map an empty body to the
+            // standard "RESPONSE" error, identical to a real empty response.
+        }
+        else {
             curl_close($ch);
 
 
@@ -358,6 +437,19 @@ class DNARest
                 $errorMessage             = $parsedResponse['message'] ?? ($parsedResponse['error']['message'] ?? $response_body);
                 $errorCode                = $parsedResponse['code'] ?? ($parsedResponse['error']['code'] ?? 'HTTP_' . $response_status);
                 $errorDetails             = $parsedResponse['details'] ?? ($parsedResponse['error']['details'] ?? $response_body);
+
+                // Empty body on an error status (429/502/503/504 from the
+                // gateway, connection reset) leaves $errorMessage == '' — the
+                // module then shows a blank error and Sentry records "(No error
+                // message)". Synthesise a stable, human-readable message from the
+                // HTTP status (e.g. "HTTP 429 - Too Many Requests") so the
+                // failure is legible end to end.
+                if (trim((string) $errorMessage) === '') {
+                    $errorMessage = 'HTTP ' . $response_status . ' - ' . $this->httpStatusReason($response_status);
+                    if (trim((string) $errorDetails) === '') {
+                        $errorDetails = $errorMessage;
+                    }
+                }
 
                 // The REST gateway returns per-field validation errors under
                 // error.validationErrors[] as { members: ["$.path.field"], message }.
@@ -610,10 +702,8 @@ class DNARest
                                 'Registrant'     => ['ID' => '']
                             ],
                             'Dates'             => [
-                                'Start'         => isset($item['startDate']) ? date('Y-m-d\TH:i:s',
-                                    strtotime($item['startDate'])) : '',
-                                'Expiration'    => isset($item['expirationDate']) ? date('Y-m-d\TH:i:s',
-                                    strtotime($item['expirationDate'])) : '',
+                                'Start'         => $this->formatApiDate($item['startDate'] ?? null),
+                                'Expiration'    => $this->formatApiDate($item['expirationDate'] ?? null),
                                 'RemainingDays' => (int)($item['remainingDay'] ?? 0),
                             ],
                             'NameServers'       => $item['nameServers'] ?? [],
@@ -1141,7 +1231,7 @@ class DNARest
                 return [
                     'result' => self::$RESULT_OK,
                     'data'   => [
-                        'ExpirationDate' => isset($response['expirationDate']) ? date('Y-m-d\TH:i:s', strtotime($response['expirationDate'])) : ''
+                        'ExpirationDate' => $this->formatApiDate($response['expirationDate'] ?? null)
                     ]
                 ];
             } else {
@@ -1561,17 +1651,15 @@ class DNARest
                 'IsChildNameServer'       => !empty($data['hosts']) ? 'true' : 'false',
                 'Contacts'                => $this->parseContactIds($data['contacts'] ?? []),
                 'Dates'                   => [
-                    'Start'         => isset($data['startDate']) ? date('Y-m-d\TH:i:s', strtotime($data['startDate'])) : '',
-                    'Expiration'    => isset($data['expirationDate']) ? date('Y-m-d\TH:i:s', strtotime($data['expirationDate'])) : '',
+                    'Start'         => $this->formatApiDate($data['startDate'] ?? null),
+                    'Expiration'    => $this->formatApiDate($data['expirationDate'] ?? null),
                     // The register endpoint returns expirationDate but no
                     // remainingDay; derive it from expirationDate so callers
                     // still get a sane day count. getDetails (which does send
                     // remainingDay) keeps using the server value.
                     'RemainingDays' => isset($data['remainingDay'])
                         ? (int)$data['remainingDay']
-                        : (isset($data['expirationDate'])
-                            ? max(0, (int)ceil((strtotime($data['expirationDate']) - time()) / 86400))
-                            : 0)
+                        : $this->remainingDaysFromDate($data['expirationDate'] ?? null)
                 ],
                 'NameServers'             => isset($data['nameservers']) ? array_map('strval',
                     $data['nameservers']) : [],
