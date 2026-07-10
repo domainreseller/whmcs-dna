@@ -227,6 +227,41 @@ trait SharedApiConfigAndUtilsTrait
         $this->errorReportingEnabled = $enabled;
     }
 
+    /**
+     * Normalize a nameserver/host name coming from module UIs before it is
+     * sent to the gateway: trim whitespace, drop the FQDN trailing dot,
+     * lowercase. Registries treat "NS1.EXAMPLE.COM." and "ns1.example.com"
+     * as the same host, but raw user input with a trailing dot or stray
+     * spaces reaches the gateway as-is and fails there (BUG-10124).
+     */
+    private function normalizeHostName($hostName): string
+    {
+        return strtolower(rtrim(trim((string) $hostName), '.'));
+    }
+
+    /**
+     * Normalize a nameserver list: normalize each entry, drop empties and
+     * duplicates, reindex. Order is preserved. Returns [] for non-arrays so
+     * callers can apply their own default-NS fallback.
+     */
+    private function normalizeHostNameList($hostNames): array
+    {
+        if (!is_array($hostNames)) {
+            return [];
+        }
+        $normalized = [];
+        foreach ($hostNames as $hostName) {
+            if (!is_string($hostName)) {
+                continue;
+            }
+            $hostName = $this->normalizeHostName($hostName);
+            if ($hostName !== '' && !in_array($hostName, $normalized, true)) {
+                $normalized[] = $hostName;
+            }
+        }
+        return $normalized;
+    }
+
     private function setError($code, $message = '', $details = ''): array
     {
         $result = [];

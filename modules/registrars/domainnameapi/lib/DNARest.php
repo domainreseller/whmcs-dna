@@ -451,6 +451,27 @@ class DNARest
                     }
                 }
 
+                // The gateway sometimes surfaces raw backend internals as the
+                // message: ABP boilerplate ("Exception of type
+                // 'Volo.Abp.BusinessException' was thrown.") or the bare error
+                // code echoed back ("Dna.DomainService:Dns:10024"). Neither
+                // tells the reseller anything. Prefer the details field when it
+                // carries real information (e.g. "Host is linked but not marked
+                // as linked in entity"), otherwise synthesise a stable message
+                // around the error code. (BUG-10124)
+                $isBoilerplate = (bool) preg_match("/Exception of type '[^']*' was thrown/i", (string) $errorMessage);
+                if ($isBoilerplate || (string) $errorMessage === (string) $errorCode) {
+                    $detailsClean = trim(preg_replace('/^Dna\s+/', '', (string) $errorDetails));
+                    if ($detailsClean !== ''
+                        && $detailsClean !== (string) $errorMessage
+                        && $detailsClean !== (string) $errorCode
+                        && !preg_match("/Exception of type '[^']*' was thrown/i", $detailsClean)) {
+                        $errorMessage = $detailsClean;
+                    } else {
+                        $errorMessage = 'The operation could not be completed by the registry (error: ' . $errorCode . '). Please try again or contact support.';
+                    }
+                }
+
                 // The REST gateway returns per-field validation errors under
                 // error.validationErrors[] as { members: ["$.path.field"], message }.
                 // Surface them to the end user instead of the generic "Validation
@@ -672,6 +693,25 @@ class DNARest
     public function getList($extra_parameters = [])
     {
         try {
+            // Callers built for the SOAP gateway page with PageNumber (0-based)
+            // + PageSize and sort with OrderColumn/OrderDirection (dna-extended
+            // does exactly this). The REST endpoint only knows SkipCount /
+            // MaxResultCount / Sorting — translate here, otherwise the legacy
+            // keys are ignored and every "page" returns the same first batch.
+            if (isset($extra_parameters['PageSize'])) {
+                $extra_parameters['MaxResultCount'] = (int) $extra_parameters['PageSize'];
+            }
+            if (isset($extra_parameters['PageNumber'])) {
+                $pageSize = (int) ($extra_parameters['PageSize'] ?? 200);
+                $extra_parameters['SkipCount'] = (int) $extra_parameters['PageNumber'] * $pageSize;
+            }
+            if (isset($extra_parameters['OrderColumn'])) {
+                $direction = strtoupper((string) ($extra_parameters['OrderDirection'] ?? 'ASC')) === 'DESC' ? 'DESC' : 'ASC';
+                $extra_parameters['Sorting'] = $extra_parameters['OrderColumn'] . ' ' . $direction;
+            }
+            unset($extra_parameters['PageNumber'], $extra_parameters['PageSize'],
+                $extra_parameters['OrderColumn'], $extra_parameters['OrderDirection']);
+
             $defaults = ['MaxResultCount' => 200, 'SkipCount' => 0];
             $params   = array_merge($defaults, $extra_parameters);
             $response = $this->request('GET', 'domains', $params);
@@ -840,7 +880,7 @@ class DNARest
     public function modifyNameServer($domainName, $nameServers)
     {
         try {
-            $payload  = ['domainName' => $domainName, 'nameServers' => array_values($nameServers)];
+            $payload  = ['domainName' => $domainName, 'nameServers' => $this->normalizeHostNameList($nameServers)];
             $response = $this->request('PUT', 'domains/dns/name-server', $payload);
 
             return [
@@ -921,7 +961,7 @@ class DNARest
         try {
             $payload = [
                 'domainName'  => $domainName,
-                'hostName'    => $nameServer,
+                'hostName'    => $this->normalizeHostName($nameServer),
                 'ipAddresses' => [
                     [
                         'ipAddress' => $ipAddress,
@@ -958,7 +998,7 @@ class DNARest
         try {
             $payload = [
                 'domainName' => $domainName,
-                'hostName'   => $nameServer
+                'hostName'   => $this->normalizeHostName($nameServer)
             ];
             $response = $this->request('DELETE', 'domains/dns/host' ,$payload);
 
@@ -987,6 +1027,7 @@ class DNARest
     public function modifyChildNameServer($domainName, $nameServer, $ipAddress)
     {
         try {
+            $nameServer = $this->normalizeHostName($nameServer);
             $payload = [
                 'domainName'  => $domainName,
                 'hostName'    => $nameServer,
@@ -1276,16 +1317,11 @@ class DNARest
                 $payloadContacts[] = $this->parseContact($details, ucfirst(strtolower($type)));
             }
 
-            // Strip empty entries first, THEN fall back to defaults — a list
-            // like ["", ""] is non-empty but yields zero valid NS, which the
-            // gateway rejects with API_560. (Parity with DNASoap::register.)
-            if (is_array($nameServers)) {
-                $nameServers = array_values(array_filter($nameServers, function ($ns) {
-                    return is_string($ns) && strlen($ns) > 0;
-                }));
-            } else {
-                $nameServers = [];
-            }
+            // Normalize + strip empty entries first, THEN fall back to
+            // defaults — a list like ["", ""] is non-empty but yields zero
+            // valid NS, which the gateway rejects with API_560. (Parity with
+            // DNASoap::register.)
+            $nameServers = $this->normalizeHostNameList($nameServers);
             if (empty($nameServers)) {
                 $nameServers = self::$DEFAULT_NAMESERVERS;
             }
