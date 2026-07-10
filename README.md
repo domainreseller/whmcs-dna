@@ -10,6 +10,12 @@
 </div>
 
 
+## 📦 İndirme — her zaman Releases kullanın!
+
+⬇️ **En güncel ve test edilmiş sürümü buradan indirin: https://github.com/domainreseller/whmcs-dna/releases/latest**
+
+> ⚠️ Yeşil **Code → Download ZIP** düğmesini **kullanmayın** — bu düğme, geliştirme aşamasındaki ham dalı indirir. Release paketleri sürümlenmiş, test edilmiş ve canlı kullanıma hazırdır.
+
 ## Kurulum ve Entegrasyon Kılavuzu
 
 ### Minimum Gereksinimler
@@ -46,6 +52,20 @@ _**Güncelleme yapıyorsanız, kurulumdan önce eski dosyalarınızı yedekleyin
 - Kaydettikten sonra, kullanıcı adınız ve mevcut bakiyeniz görünecektir.
 - Kullanıcılarınızın .tr alan adını almak için kullanılacak TR Kimlik Numarası ve Vergi Numarası Bilgisini ayarlardan eşleştirin.
 - USD dışında tek bir öncelikli para birimi kullanıyorsanız "TLD Senkronizasyonu için Döviz Dönüşümü" ayarını yapabilirsiniz. (Bu ayar yalnızca bölgesel TLD ithalatı için fiyat senkronizasyonu için kullanılmaktadır. Aksi takdirde değiştirmeniz gerekmez)
+
+## 🔑 API Kimlik Bilgileri — Kullanıcı Adı/Şifre mi, Reseller ID/API Key mi?
+
+Her ikisi de desteklenir — bilgileri aynı iki modül alanına girin; modül hangi API'nin kullanılacağını otomatik olarak algılar:
+
+| Elinizdeki bilgi | "Kullanıcı Adı" alanı | "Şifre" alanı | Kullanılan API |
+|---|---|---|---|
+| **Yeni panel kimlik bilgileri** (önerilen) | Reseller ID — `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` biçiminde UUID | API Key | REST |
+| **Eski (legacy) kimlik bilgileri** | API kullanıcı adı | API şifresi | SOAP |
+
+> 💡 **Reseller ID** ve **API Key** bilgilerinizi DomainNameAPI panelinizde **API Ayarları** bölümünde bulabilirsiniz.
+> ⚠️ Bunlar **API kimlik bilgileridir** — panele giriş yaptığınız e-posta ve şifre burada **ÇALIŞMAZ**! Mutlaka **API Ayarları** bölümündeki **Reseller ID (UUID)** ve **API Key** kullanılmalıdır.
+
+Ek bir yapılandırma gerekmez — kullanıcı adı alanında bir UUID varsa modül modern REST API'yi, aksi halde klasik SOAP'ı kullanır.
 
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Youtube bağlantısı </a>

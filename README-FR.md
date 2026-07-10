@@ -10,6 +10,12 @@
 </div>
 
 
+## 📦 Téléchargement — utilisez toujours les Releases !
+
+⬇️ **Téléchargez ici la dernière version testée : https://github.com/domainreseller/whmcs-dna/releases/latest**
+
+> ⚠️ N'utilisez **pas** le bouton vert **Code → Download ZIP** — il télécharge la branche de développement brute. Les paquets de release sont versionnés, testés et prêts pour la production.
+
 ## Guide d'installation et d'intégration
 
 ### Exigences minimales
@@ -46,6 +52,20 @@ Placez le dossier "modules" dans le dossier que vous avez téléchargé à l'emp
 - Après l'enregistrement, votre nom d'utilisateur et votre solde actuel seront visibles.
 - Faites correspondre le numéro d'identification TR et les informations sur le numéro de taxe à utiliser pour obtenir le nom de domaine .tr de vos utilisateurs, le cas échéant, à partir des paramètres que vous avez vus.
 - Si vous utilisez une seule devise principale autre que l'USD, vous pouvez définir le paramètre "Exchange Convertion For TLD Sync". (Ce paramètre est utilisé uniquement pour la synchronisation des prix pour les importations de TLD régionaux. Sinon, vous n'avez pas besoin de le modifier)
+
+## 🔑 Identifiants API — Nom d'utilisateur/Mot de passe ou Reseller ID/API Key ?
+
+Les deux sont pris en charge — saisissez-les dans les deux mêmes champs du module ; le module détecte automatiquement l'API à utiliser :
+
+| Vous disposez de | Champ « Nom d'utilisateur » | Champ « Mot de passe » | API utilisée |
+|---|---|---|---|
+| **Nouveaux identifiants du panneau** (recommandé) | Reseller ID — UUID au format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | API Key | REST |
+| **Anciens identifiants (legacy)** | Nom d'utilisateur API | Mot de passe API | SOAP |
+
+> 💡 Vous trouverez votre **Reseller ID** et votre **API Key** dans votre panneau DomainNameAPI, section **Paramètres API**.
+> ⚠️ Ce sont des **identifiants API** — l'e-mail et le mot de passe de connexion à votre panneau ne fonctionneront **pas** ici.
+
+Aucune configuration supplémentaire n'est nécessaire — si le champ nom d'utilisateur contient un UUID, le module utilise l'API REST moderne, sinon le SOAP classique.
 
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Lien Youtube</a>

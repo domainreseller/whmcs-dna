@@ -10,6 +10,12 @@
 </div>
 
 
+## 📦 下载 — 请务必使用 Releases！
+
+⬇️ **在此获取最新的已测试版本：https://github.com/domainreseller/whmcs-dna/releases/latest**
+
+> ⚠️ 请**不要**使用绿色的 **Code → Download ZIP** 按钮 — 它下载的是未经处理的开发分支。Release 包经过版本管理和测试，可直接用于生产环境。
+
 ## 安装和集成指南
 
 ### 最低要求
@@ -46,6 +52,20 @@ _**如果你是在升级，请在安装之前备份旧文件。**_
 - 保存后，你的用户名和当前余额将可见。
 - 从你看到的设置中匹配用于获取用户的 TR 身份证号码和税号信息，如果有的话。
 - 如果你使用的是除美元以外的单一主要货币，你可以设置 "Exchange Convertion For TLD Sync" 设置。（此设置仅用于地区 TLD 导入的定价同步。否则，你不需要更改）
+
+## 🔑 API 凭据 — 用户名/密码还是 Reseller ID/API Key？
+
+两种方式均受支持 — 将凭据填入相同的两个模块字段即可；模块会自动检测应使用哪种 API：
+
+| 你拥有的凭据 | "用户名" 字段 | "密码" 字段 | 使用的 API |
+|---|---|---|---|
+| **新版面板凭据**（推荐） | Reseller ID — 形如 `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` 的 UUID | API Key | REST |
+| **旧版凭据** | API 用户名 | API 密码 | SOAP |
+
+> 💡 你可以在 DomainNameAPI 面板的 **API 设置** 中找到你的 **Reseller ID** 和 **API Key**。
+> ⚠️ 这些是 **API 凭据** — 你登录面板所用的电子邮箱和密码在此**无法使用**。
+
+无需额外配置 — 如果用户名字段中填写的是 UUID，模块将使用现代 REST API，否则使用经典 SOAP。
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Youtube 链接</a>
 

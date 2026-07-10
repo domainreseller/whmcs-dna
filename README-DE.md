@@ -10,6 +10,12 @@
 </div>
 
 
+## 📦 Download — immer die Releases verwenden!
+
+⬇️ **Die neueste getestete Version finden Sie hier: https://github.com/domainreseller/whmcs-dna/releases/latest**
+
+> ⚠️ Verwenden Sie **nicht** den grünen Button **Code → Download ZIP** — damit laden Sie den rohen Entwicklungszweig herunter. Release-Pakete sind versioniert, getestet und produktionsbereit.
+
 ## Installations- und Integrationsanleitung
 
 ### Mindestanforderungen
@@ -46,6 +52,20 @@ Legen Sie den "modules"-Ordner in den Ordner, den Sie heruntergeladen haben, in 
 - Nach dem Speichern werden Ihr Benutzername und das aktuelle Guthaben angezeigt.
 - Stimmen Sie die in den Einstellungen angezeigten Informationen zur türkischen Identifikationsnummer und Steuernummer ab, um den .tr-Domänennamen Ihrer Benutzer zu erhalten, sofern vorhanden.
 - Wenn Sie außer USD eine Einheitswährung verwenden, können Sie die Einstellung "Exchange Convertion For TLD Sync" festlegen. (Diese Einstellung dient nur der Preissynchronisierung für regionale TLD-Imports. Andernfalls müssen Sie nichts ändern.)
+
+## 🔑 API-Zugangsdaten — Benutzername/Passwort oder Reseller ID/API Key?
+
+Beides wird unterstützt — tragen Sie die Daten in dieselben zwei Modulfelder ein; das Modul erkennt automatisch, welche API verwendet wird:
+
+| Sie haben | Feld "Benutzername" | Feld "Passwort" | Verwendete API |
+|---|---|---|---|
+| **Neue Panel-Zugangsdaten** (empfohlen) | Reseller ID — UUID im Format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | API Key | REST |
+| **Alte (Legacy-)Zugangsdaten** | API-Benutzername | API-Passwort | SOAP |
+
+> 💡 Ihre **Reseller ID** und Ihren **API Key** finden Sie in Ihrem DomainNameAPI-Panel unter **API-Einstellungen**.
+> ⚠️ Dies sind **API-Zugangsdaten** — die E-Mail-Adresse und das Passwort Ihres Panel-Logins funktionieren hier **nicht**.
+
+Es ist keine zusätzliche Konfiguration erforderlich — enthält das Benutzernamensfeld eine UUID, verwendet das Modul die moderne REST-API, andernfalls klassisches SOAP.
 
 <a href="https://youtu.be/LEw_iMnquSo">+ YouTube-Link</a>
 

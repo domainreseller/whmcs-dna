@@ -11,7 +11,13 @@
 </div>
 
 
-## Yükləmə və Enteqrasiya Təlimatı
+## 📦 Yükləmə — həmişə Releases istifadə edin!
+
+⬇️ **Ən son test edilmiş versiyanı buradan yükləyin: https://github.com/domainreseller/whmcs-dna/releases/latest**
+
+> ⚠️ Yaşıl **Code → Download ZIP** düyməsini **istifadə etməyin** — bu düymə emal olunmamış inkişaf qolunu (development branch) yükləyir. Release paketləri versiyalanmış, test edilmiş və istehsalata hazırdır.
+
+## Quraşdırma və Enteqrasiya Təlimatı
 
 ### Minimum Tələblər
 
@@ -48,6 +54,20 @@ Yüklədiyiniz qovluğa "modules" qovluğunu WHMCS-in quraşdırıldığı qovlu
 - Yaddaşa aldıqdan sonra, istifadəçi adınız və cari balansınız görünür olacaq.
 - Köhnər müştərilərinizin .tr domen adını əldə etmək üçün istifadə ediləcək TR Şəxsiyyət Vəsiqəsi Nömrəsi və Vergi Nömrəsi Məlumatını quraşdırmış olduğunuz parametrlərlə uyğunlaşdırın.
 - Əgər USD-dan başqa bir əsas valyuta istifadə edirsinizsə, "TLD Sync üçün Exchange Konvertasiya" parametrini təyin edə bilərsiniz. (Bu parametr yalnız bölgəvi TLD girişləri üçün qiymət sinxronizasiyası üçün istifadə edilir. Başqa tənzimləməyə ehtiyacınız yoxdur)
+
+## 🔑 API Giriş Məlumatları — İstifadəçi adı/Şifrə, yoxsa Reseller ID/API Key?
+
+Hər ikisi dəstəklənir — məlumatları eyni iki modul sahəsinə daxil edin; modul hansı API-nin istifadə olunacağını avtomatik müəyyən edir:
+
+| Sizdə olan | "İstifadəçi adı" sahəsi | "Şifrə" sahəsi | İstifadə olunan API |
+|---|---|---|---|
+| **Yeni panel giriş məlumatları** (tövsiyə olunur) | Reseller ID — `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` formatında UUID | API Key | REST |
+| **Köhnə (legacy) giriş məlumatları** | API istifadəçi adı | API şifrəsi | SOAP |
+
+> 💡 **Reseller ID** və **API Key** məlumatlarınızı DomainNameAPI panelinizdə **API Parametrləri** bölməsində tapa bilərsiniz.
+> ⚠️ Bunlar **API giriş məlumatlarıdır** — panelə daxil olduğunuz e-poçt və şifrə burada **işləməyəcək**.
+
+Əlavə konfiqurasiya tələb olunmur — istifadəçi adı sahəsində UUID varsa, modul müasir REST API-dən, əks halda klassik SOAP-dan istifadə edir.
 
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Youtube link </a>
