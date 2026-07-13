@@ -698,16 +698,152 @@ function domainnameapi_IDProtectToggle($params) {
     return $values;
 }
 
+/**
+ * Convert a gateway FQDN record name (e.g. "www.example.com.") into the
+ * relative host WHMCS expects ("www"; apex becomes an empty string).
+ */
+function domainnameapi_dns_relative_host($fqdn, $domain)
+{
+    $fqdn   = rtrim((string) $fqdn, '.');
+    $domain = rtrim((string) $domain, '.');
+    if (strcasecmp($fqdn, $domain) === 0) {
+        return '';
+    }
+    $suffix = '.' . $domain;
+    if (strlen($fqdn) > strlen($suffix) && strcasecmp(substr($fqdn, -strlen($suffix)), $suffix) === 0) {
+        return substr($fqdn, 0, -strlen($suffix));
+    }
+    return $fqdn;
+}
+
 function domainnameapi_GetDNS($params)
 {
-    $values["error"] = "DNS Management does not supported by Domain Name API.";
+    sleep(1);
+    $dna    = getDNAApi($params);
+    $domain = $params["sld"] . "." . $params["tld"];
+
+    $result = $dna->GetResourceRecords($domain);
+    $values = [];
+
+    if ($result["result"] == "OK") {
+        foreach ($result["data"]["records"] as $rec) {
+            $type = strtoupper($rec["Type"]);
+            // SOA/NS are managed by the registry zone itself, not editable here.
+            if (in_array($type, ['SOA', 'NS'])) {
+                continue;
+            }
+
+            $address  = rtrim((string) $rec["Content"], '.');
+            $priority = '';
+            if ($type === 'MX') {
+                // Gateway stores MX content as "<priority> <target>".
+                $parts = preg_split('/\s+/', trim($rec["Content"]), 2);
+                if (count($parts) === 2) {
+                    $priority = $parts[0];
+                    $address  = rtrim($parts[1], '.');
+                }
+            }
+
+            $values[] = [
+                'hostname' => domainnameapi_dns_relative_host($rec["Name"], $domain),
+                'type'     => $type,
+                'address'  => $address,
+                'priority' => $priority !== '' ? $priority : 'N/A',
+            ];
+        }
+    } else {
+        $values["error"] = $result["error"]["Message"] . " - " . $result["error"]["Details"];
+    }
+
+    logModuleCall("domainnameapi", substr(__FUNCTION__, 14), $dna->getRequestData(), $dna->getResponseData(), $values);
 
     return $values;
 }
 
 function domainnameapi_SaveDNS($params)
 {
-    $values["error"] = "DNS Management does not supported by Domain Name API!!!";
+    $dna    = getDNAApi($params);
+    $domain = $params["sld"] . "." . $params["tld"];
+
+    // Current state, so we only touch what actually changed (fewer API calls,
+    // and we never drop a record because a later add failed).
+    $current = $dna->GetResourceRecords($domain);
+    if ($current["result"] != "OK") {
+        $values = ["error" => $current["error"]["Message"] . " - " . $current["error"]["Details"]];
+        logModuleCall("domainnameapi", substr(__FUNCTION__, 14), $dna->getRequestData(), $dna->getResponseData(), $values);
+        return $values;
+    }
+
+    // Build a comparable "key => descriptor" map for the existing editable set.
+    $existing = [];
+    foreach ($current["data"]["records"] as $rec) {
+        $type = strtoupper($rec["Type"]);
+        if (in_array($type, ['SOA', 'NS'])) {
+            continue;
+        }
+        $host    = domainnameapi_dns_relative_host($rec["Name"], $domain);
+        $content = rtrim((string) $rec["Content"], '.');
+        $key     = strtolower($host) . '|' . $type . '|' . strtolower($content);
+        $existing[$key] = ['Name' => $rec["Name"], 'Content' => $rec["Content"], 'Type' => $type];
+    }
+
+    // Desired state coming from the WHMCS DNS form.
+    $desired = [];
+    foreach ((array) $params["dnsrecords"] as $rec) {
+        $type = strtoupper(trim($rec["type"] ?? ''));
+        $addr = trim($rec["address"] ?? '');
+        if ($type === '' || $addr === '') {
+            continue;
+        }
+        $host    = trim($rec["hostname"] ?? '');
+        $host    = ($host === '@') ? '' : $host;
+        $content = $addr;
+        if ($type === 'MX' && isset($rec["priority"]) && $rec["priority"] !== '' && strtoupper($rec["priority"]) !== 'N/A') {
+            $content = $rec["priority"] . ' ' . $addr;
+        }
+        $key = strtolower($host) . '|' . $type . '|' . strtolower(rtrim($content, '.'));
+        $desired[$key] = ['host' => $host, 'type' => $type, 'content' => $content];
+    }
+
+    $error   = null;
+    $touched = false;
+
+    // Delete records that are no longer desired (apply deferred to the end).
+    foreach ($existing as $key => $rec) {
+        if (!isset($desired[$key])) {
+            $del = $dna->DeleteResourceRecord($domain, $rec["Name"], $rec["Content"], $rec["Type"], false);
+            $touched = true;
+            if ($del["result"] != "OK") {
+                $error = $del["error"];
+            }
+        }
+    }
+
+    // Add records that are newly desired. The gateway appends the zone domain
+    // to the record name itself, so we send the RELATIVE host (e.g. "www"),
+    // never the FQDN — sending "www.example.com" would store it doubled as
+    // "www.example.com.example.com". Apex records use an empty name.
+    foreach ($desired as $key => $rec) {
+        if (!isset($existing[$key])) {
+            $add = $dna->AddResourceRecord($domain, $rec["host"], $rec["type"], $rec["content"], 3600, false);
+            $touched = true;
+            if ($add["result"] != "OK") {
+                $error = $add["error"];
+            }
+        }
+    }
+
+    // Commit staged changes once.
+    if ($touched) {
+        $apply = $dna->ApplyResourceRecords($domain);
+        if ($apply["result"] != "OK") {
+            $error = $apply["error"];
+        }
+    }
+
+    $values = $error ? ["error" => $error["Message"] . " - " . $error["Details"]] : [];
+
+    logModuleCall("domainnameapi", substr(__FUNCTION__, 14), $dna->getRequestData(), $dna->getResponseData(), $values);
 
     return $values;
 }

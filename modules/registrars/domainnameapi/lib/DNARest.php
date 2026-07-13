@@ -1058,6 +1058,229 @@ class DNARest
     }
 
     /**
+     * List the DNS zone resource records for a domain.
+     *
+     * GET /domains/zones?domainName=... returns an array of resource-record
+     * SETS ({ name, ttl, type, records:[{content,disabled}] }). We flatten it
+     * to one row per content value so callers get a simple record list.
+     *
+     * @param string $domainName
+     * @return array
+     */
+    public function getResourceRecords($domainName)
+    {
+        try {
+            $response = $this->request('GET', 'domains/zones', ['domainName' => $domainName]);
+
+            $records = [];
+            foreach ((array) $response as $set) {
+                if (!is_array($set)) {
+                    continue;
+                }
+                $name = $set['name'] ?? '';
+                $type = $set['type'] ?? '';
+                $ttl  = (int) ($set['ttl'] ?? 0);
+                $rows = $set['records'] ?? [];
+                if (!is_array($rows) || !$rows) {
+                    // A set with no records still describes a name/type pair.
+                    $records[] = ['Name' => $name, 'Type' => $type, 'TTL' => $ttl, 'Content' => '', 'Disabled' => false];
+                    continue;
+                }
+                foreach ($rows as $rec) {
+                    $records[] = [
+                        'Name'     => $name,
+                        'Type'     => $type,
+                        'TTL'      => $ttl,
+                        'Content'  => $rec['content'] ?? '',
+                        'Disabled' => !empty($rec['disabled']),
+                    ];
+                }
+            }
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => ['records' => $records],
+            ];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'GET_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Add a DNS zone resource record.
+     *
+     * POST /domains/zones?domainName=... with a ZoneCreateInput body. The
+     * domainName is a QUERY parameter while the record lives in the JSON body,
+     * so the query string is baked into the endpoint (request() only appends
+     * query params for GET/DELETE). Staged changes must be committed with
+     * applyResourceRecords().
+     *
+     * @param string $domainName
+     * @param string $name    Record label (e.g. "www", "@")
+     * @param string $type    Record type (A, AAAA, CNAME, MX, TXT, ...)
+     * @param string|array $content One value or a list of values for the record set
+     * @param int    $ttl     1..86400 seconds
+     * @param bool   $apply   Commit immediately (default true)
+     * @return array
+     */
+    public function addResourceRecord($domainName, $name, $type, $content, $ttl = 3600, $apply = true)
+    {
+        try {
+            $body     = ['zoneStruct' => $this->buildZoneStruct($name, $type, $content, $ttl)];
+            $endpoint = 'domains/zones?' . http_build_query(['domainName' => $domainName]);
+            $this->request('POST', $endpoint, $body);
+
+            if ($apply) {
+                $this->applyResourceRecords($domainName);
+            }
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => ['Name' => $name, 'Type' => $type, 'TTL' => (int) $ttl, 'Content' => $content],
+            ];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'ADD_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Edit an existing DNS zone resource record.
+     *
+     * PUT /domains/zones?domainName=...&recordName=... with a ZoneCreateInput
+     * body describing the new state of the record identified by $recordName.
+     *
+     * @param string $domainName
+     * @param string $recordName Current record label being edited
+     * @param string $name    New record label (usually same as $recordName)
+     * @param string $type    Record type
+     * @param string|array $content New value(s)
+     * @param int    $ttl
+     * @param bool   $apply
+     * @return array
+     */
+    public function editResourceRecord($domainName, $recordName, $name, $type, $content, $ttl = 3600, $apply = true)
+    {
+        try {
+            $body     = ['zoneStruct' => $this->buildZoneStruct($name, $type, $content, $ttl)];
+            $endpoint = 'domains/zones?' . http_build_query(['domainName' => $domainName, 'recordName' => $recordName]);
+            $this->request('PUT', $endpoint, $body);
+
+            if ($apply) {
+                $this->applyResourceRecords($domainName);
+            }
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => ['Name' => $name, 'Type' => $type, 'TTL' => (int) $ttl, 'Content' => $content],
+            ];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'EDIT_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Delete a DNS zone resource record.
+     *
+     * DELETE /domains/zones takes everything as QUERY parameters. Note the
+     * mixed casing dictated by the gateway: domainName is camelCase while
+     * Name/Record/RecordType are PascalCase — they are matched literally.
+     *
+     * @param string $domainName
+     * @param string $name       Record label
+     * @param string $record     The record content/value being removed
+     * @param string $recordType Record type (A, MX, ...)
+     * @param bool   $apply
+     * @return array
+     */
+    public function deleteResourceRecord($domainName, $name, $record, $recordType, $apply = true)
+    {
+        try {
+            $this->request('DELETE', 'domains/zones', [
+                'domainName' => $domainName,
+                'Name'       => $name,
+                'Record'     => $record,
+                'RecordType' => $recordType,
+            ]);
+
+            if ($apply) {
+                $this->applyResourceRecords($domainName);
+            }
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => ['Name' => $name, 'Type' => $recordType, 'Content' => $record],
+            ];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'DELETE_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Commit staged DNS zone changes for a domain.
+     * POST /domains/zones/apply?domainName=...
+     *
+     * @param string $domainName
+     * @return array
+     */
+    public function applyResourceRecords($domainName)
+    {
+        try {
+            $endpoint = 'domains/zones/apply?' . http_build_query(['domainName' => $domainName]);
+            $this->request('POST', $endpoint, []);
+
+            return ['result' => self::$RESULT_OK, 'data' => ['DomainName' => $domainName]];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'APPLY_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Build a ZoneCreateDto payload from loose arguments.
+     * @param string $name
+     * @param string $type
+     * @param string|array $content
+     * @param int $ttl
+     * @return array
+     */
+    private function buildZoneStruct($name, $type, $content, $ttl)
+    {
+        $ttl = (int) $ttl;
+        if ($ttl < 1) {
+            $ttl = 3600;
+        }
+        if ($ttl > 86400) {
+            $ttl = 86400;
+        }
+
+        return [
+            'name'     => (string) $name,
+            'ttl'      => $ttl,
+            'type'     => strtoupper((string) $type),
+            'contents' => array_values(array_map('strval', (array) $content)),
+        ];
+    }
+
+    /**
      * Get contact information for a domain
      * @param string $domainName
      * @return array
