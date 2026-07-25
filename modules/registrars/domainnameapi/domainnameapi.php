@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 2.2.10
+ * @version 3.0.10
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
@@ -20,7 +20,7 @@ new DomainNameApi\Services\Language();
 
 function domainnameapi_version(): string
 {
-    return '2.2.10';
+    return '3.0.10';
 }
 
 function domainnameapi_getConfigArray($params) {
@@ -54,7 +54,7 @@ function domainnameapi_getConfigArray($params) {
             $testmode = $params["API_TestMode"];
 
 
-            $addionalMessage = "Don't have an Domain Name API account yet? Get one here: <a href='https://www.domainnameapi.com/become-a-reseller' target='_blank'>https://www.domainnameapi.com/become-a-reseller</a>";
+            $addionalMessage = "Don't have a Domain Name API account yet? Get one here: <a href='https://www.domainnameapi.com/become-a-reseller' target='_blank'>https://www.domainnameapi.com/become-a-reseller</a>";
             $sysMsg = domainnameapi_parse_cache('user_'.$username.md5($password).$testmode, 100, function () use ($dna) {
 
                 $details = $dna->GetResellerDetails();
@@ -63,6 +63,24 @@ function domainnameapi_getConfigArray($params) {
 
                 if ($details['result'] != 'OK') {
                      $sysMsg = "<b>Username and password combination not correct</b>";
+
+                     if (!empty($details['error'])) {
+                         $err        = $details['error'];
+                         $errParts   = [];
+                         if (!empty($err['Code']))    { $errParts[] = "Code: <b>{$err['Code']}</b>"; }
+                         if (!empty($err['Message'])) { $errParts[] = "Message: <b>{$err['Message']}</b>"; }
+                         if (!empty($err['Details']) && $err['Details'] !== ($err['Message'] ?? '')) {
+                             $errParts[] = "Details: {$err['Details']}";
+                         }
+                         if ($errParts) {
+                             $sysMsg .= "<br><span style='color:#c0392b'>" . implode(' | ', $errParts) . "</span>";
+                         }
+                     }
+
+                     $sysMsg .= " | V.".domainnameapi_version();
+
+                     // Don't cache credential/API errors so the next save retries.
+                     return ['__dna_nocache' => $sysMsg];
                 } else {
                     $balances = [];
                      $sysMsg = "User: <b>{$details['name']}({$details['id']})</b> , Balance: ";
@@ -70,6 +88,8 @@ function domainnameapi_getConfigArray($params) {
                         $balances[]= "<b>{$v['balance']}{$v['symbol']}</b>";
                      }
                     $sysMsg .= implode(' | ', $balances);
+
+                    $sysMsg.= " | V.".domainnameapi_version();
                     $addionalMessage='';
 
                 }
@@ -114,25 +134,25 @@ function domainnameapi_getConfigArray($params) {
                 "Description"  => "Check for using test platform!"
             ],
             'TrIdendity'   => [
-                'FriendlyName' => 'Turkish Identity',
+                'FriendlyName' => 'Turkish Identity Number',
                 'Type'         => 'dropdown',
                 'Options'      => $customfields,
-                'Description'  => 'Turkish Identity Custom Field , required only .tr tld',
+                'Description'  => 'Turkish Identity Number Custom Field, required only for .tr TLD',
             ],
             'TrTaxOffice'  => [
                 'FriendlyName' => 'Turkish Tax Office',
                 'Type'         => 'dropdown',
                 'Options'      => $customfields,
-                'Description'  => 'Turkish Tax Office Custom Field , required only .tr tld',
+                'Description'  => 'Turkish Tax Office Custom Field, required only for .tr TLD',
             ],
             'TrTaxNumber'  => [
-                'FriendlyName' => 'Turkish TaxNumber',
+                'FriendlyName' => 'Turkish Tax Identification Number',
                 'Type'         => 'dropdown',
                 'Options'      => $customfields,
-                'Description'  => 'Turkish TaxNumber Custom Field , required only .tr tld',
+                'Description'  => 'Turkish Tax Identification Number Custom Field, required only for .tr TLD',
             ],
             'basecurrency' => [
-                'FriendlyName' => 'Exchange Convertion For TLD Sync',
+                'FriendlyName' => 'Exchange Conversion for TLD Sync',
                 'Type'         => 'dropdown',
                 'Options'      => [
                     'no'  => 'Do Not Convert',
@@ -144,7 +164,23 @@ function domainnameapi_getConfigArray($params) {
                     'CNY' => 'to CNY',
                     'AED' => 'to AED',
                 ],
-                'Description'  => 'Base Currency Convertion. <br><b>Strongly advice to not use this feature</b>. Using this feature means that you have read and fully understood the  <a href="https://github.com/domainreseller/whmcs-dna/blob/main/DISCLAIMER.md" target="_blank">DISCLAIMER AND WAIVER OF LIABILITY</a>'
+                'Description'  => 'Base Currency Conversion. <br><b>Strongly advice to not use this feature</b>. Using this feature means that you have read and fully understood the  <a href="https://github.com/domainreseller/whmcs-dna/blob/main/DISCLAIMER.md" target="_blank">DISCLAIMER AND WAIVER OF LIABILITY</a>'
+            ],
+            'AI_Suggestion' => [
+                'FriendlyName' => 'AI Domain Suggestions',
+                'Type'         => 'dropdown',
+                'Options'      => [
+                    'disabled' => 'Disabled',
+                    'country'  => 'Country Based',
+                    'language' => 'Language Based',
+                ],
+                'Description'  => 'Enable AI-powered domain suggestions using OpenAI. Country uses client country code, Language uses browser Accept-Language header.'
+            ],
+            'AI_OpenAI_Key' => [
+                'FriendlyName' => 'OpenAI API Key',
+                'Type'         => 'password',
+                'Size'         => '60',
+                'Description'  => 'Enter your OpenAI API key for AI-powered domain suggestions.'
             ],
         ];
     } else {
@@ -771,15 +807,51 @@ function domainnameapi_GetDomainSuggestions($params) {
         $all_tlds[]=ltrim($v,'.');
     }
 
+    // Build labels list: original + AI suggestions (if enabled)
+    $labels = [$label];
 
-    //$tld=str_replace(".","",$domain['tld']);
-    $result = $dna->CheckAvailability([$label],$all_tlds,"1","create");
+    $aiMode = isset($params['AI_Suggestion']) ? $params['AI_Suggestion'] : 'disabled';
+    $apiKey = isset($params['AI_OpenAI_Key']) ? $params['AI_OpenAI_Key'] : '';
+
+    if ($aiMode !== 'disabled' && !empty($apiKey)) {
+        $locale = 'en';
+
+        if ($aiMode === 'country') {
+            if (isset($_SESSION['uid']) && $_SESSION['uid'] > 0) {
+                try {
+                    $client = Capsule::table('tblclients')
+                        ->where('id', $_SESSION['uid'])
+                        ->first(['country']);
+                    if ($client && !empty($client->country)) {
+                        $locale = $client->country;
+                    }
+                } catch (\Exception $e) {
+                    // fallback to default locale
+                }
+            }
+        } elseif ($aiMode === 'language') {
+            if (isset($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
+                $locale = substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 5);
+            }
+        }
+
+        $aiSuggestions = domainnameapi_openai_suggestions($params['searchTerm'], $locale, $apiKey);
+
+        foreach ($aiSuggestions as $suggestion) {
+            if (!in_array($suggestion, $labels)) {
+                $labels[] = $suggestion;
+            }
+        }
+    }
+
+    $result = $dna->CheckAvailability($labels,$all_tlds,"1","create");
 
     $exchange_rates = domainnameapi_exchangerates();
 
 
     foreach ($result as $k => $v) {
-        $searchResult = new SearchResult($label, '.'.$v['TLD']);
+        $sld = strtolower(str_replace('.' . $v['TLD'], '', $v['DomainName']));
+        $searchResult = new SearchResult($sld, '.'.$v['TLD']);
 
         $register_price = $v['Price'];
         $renew_price = $v['Price'];
@@ -832,7 +904,10 @@ function domainnameapi_GetTldPricing($params) {
 
     $values = [];
 
-    $tldlist = $dna->GetTldList(1200);
+    // REST gateway caps MaxResultCount at 1000 — anything higher returns
+    // 400 ModelState. SOAP doesn't have this cap but works fine with 1000
+    // too (total catalogue is ~850).
+    $tldlist = $dna->GetTldList(1000);
 
     $convertable_currencies = domainnameapi_exchangerates();
 
@@ -1016,9 +1091,9 @@ function domainnameapi_TransferSync($params) {
                 $values['failed']=false;
             }
             if (in_array($result2["data"]["Status"],['PendingDelete','Deleted'])) {
-                $expired = true;
-                $active  = false;
-                $transferaway=false;
+                $values['completed']=false;
+                $values['failed']=true;
+                $values['reason']='Domain is ' . $result2["data"]["Status"];
             }
             if ($result2["data"]["Status"] == "TransferCancelledFromClient") {
                 $values['completed']=true;
@@ -1344,6 +1419,13 @@ function domainnameapi_parse_cache($key,$ttl,$callback){
 
         $data = $callback();
 
+        // Callbacks can opt out of caching for transient states (e.g. an API
+        // error) by returning ['__dna_nocache' => $value]. We hand back the
+        // value but leave the cache untouched so the next call retries.
+        if (is_array($data) && array_key_exists('__dna_nocache', $data)) {
+            return $data['__dna_nocache'];
+        }
+
         Capsule::table('tblconfiguration')
                ->where('setting', $cache_key)
                ->update([
@@ -1384,5 +1466,67 @@ function domainnameapi_exchangerates() {
 
 
     return $rates;
+}
+
+function domainnameapi_openai_suggestions($searchTerm, $locale, $apiKey) {
+    try {
+        $cacheKey = 'ai_suggest_' . md5($searchTerm . '_' . $locale);
+
+        return domainnameapi_parse_cache($cacheKey, 3600, function () use ($searchTerm, $locale, $apiKey) {
+            $prompt = "Given the search term \"{$searchTerm}\", suggest 10 alternative domain name labels (SLD only, without any TLD extension like .com). "
+                    . "The suggestions should be relevant, creative and suitable for the locale/language: {$locale}. "
+                    . "Return ONLY a JSON array of strings. Example: [\"suggestion1\",\"suggestion2\"]";
+
+            $data = [
+                'model'       => 'gpt-4o-mini',
+                'messages'    => [
+                    ['role' => 'system', 'content' => 'You are a domain name suggestion assistant. Always respond with only a valid JSON array of domain name labels (SLD only, no TLD). No explanations, no markdown.'],
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+                'temperature' => 0.8,
+                'max_tokens'  => 200,
+            ];
+
+            $ch = curl_init('https://api.openai.com/v1/chat/completions');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $apiKey,
+            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode !== 200 || !$response) {
+                return [];
+            }
+
+            $decoded = json_decode($response, true);
+            $content = $decoded['choices'][0]['message']['content'] ?? '';
+
+            $suggestions = json_decode(trim($content), true);
+
+            if (!is_array($suggestions)) {
+                return [];
+            }
+
+            $clean = [];
+            foreach ($suggestions as $s) {
+                $s = strtolower(trim($s));
+                $s = preg_replace('/[^a-z0-9\-]/', '', $s);
+                if (!empty($s) && strlen($s) <= 63) {
+                    $clean[] = $s;
+                }
+            }
+
+            return array_slice($clean, 0, 10);
+        });
+    } catch (\Exception $e) {
+        return [];
+    }
 }
 

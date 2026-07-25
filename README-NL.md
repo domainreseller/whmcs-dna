@@ -10,6 +10,12 @@
 </div>
 
 
+## 📦 Download — gebruik altijd de Releases!
+
+⬇️ **Download hier de nieuwste geteste versie: https://github.com/domainreseller/whmcs-dna/releases/latest**
+
+> ⚠️ Gebruik **niet** de groene knop **Code → Download ZIP** — daarmee downloadt u de ruwe ontwikkelbranch. Release-pakketten zijn geversioneerd, getest en klaar voor productie.
+
 ## Installatie- en integratiehandleiding
 
 ### Minimale vereisten
@@ -47,6 +53,20 @@ Plaats de map "modules" in de map die u hebt gedownload in de map waar Whmcs is 
 - Nadat u heeft opgeslagen, is uw gebruikersnaam en huidige saldo zichtbaar.
 - Stem het TR-identiteitsnummer en de btw-nummerinformatie af die wordt gebruikt om de .tr-domeinnaam van uw gebruikers te verkrijgen, indien aanwezig, op de instellingen die u hebt gezien.
 - Als u een enkele primaire valuta gebruikt behalve USD, kunt u de instelling "Exchange Convertion For TLD Sync" instellen. (Deze instelling wordt alleen gebruikt voor prijssynchronisatie voor regionale TLD-imports. Anders hoeft u niets te wijzigen)
+
+## 🔑 API-inloggegevens — Gebruikersnaam/Wachtwoord of Reseller ID/API Key?
+
+Beide worden ondersteund — voer ze in dezelfde twee modulevelden in; de module detecteert automatisch welke API wordt gebruikt:
+
+| U heeft | Veld "Gebruikersnaam" | Veld "Wachtwoord" | Gebruikte API |
+|---|---|---|---|
+| **Nieuwe panel-inloggegevens** (aanbevolen) | Reseller ID — UUID zoals `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | API Key | REST |
+| **Oude (legacy) inloggegevens** | API-gebruikersnaam | API-wachtwoord | SOAP |
+
+> 💡 U vindt uw **Reseller ID** en **API Key** in uw DomainNameAPI-paneel onder **API-instellingen**.
+> ⚠️ Dit zijn **API-inloggegevens** — het e-mailadres en wachtwoord waarmee u in het paneel inlogt, werken hier **niet**.
+
+Er is geen extra configuratie nodig — als het gebruikersnaamveld een UUID bevat, gebruikt de module de moderne REST-API, anders klassiek SOAP.
 
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Youtube-link </a>
