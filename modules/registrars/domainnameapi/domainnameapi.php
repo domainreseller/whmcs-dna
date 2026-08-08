@@ -768,6 +768,7 @@ function domainnameapi_SaveDNS($params)
     // Current state, so we only touch what actually changed (fewer API calls,
     // and we never drop a record because a later add failed).
     $current = $dna->GetResourceRecords($domain);
+    sleep(1);
     if ($current["result"] != "OK") {
         $values = ["error" => $current["error"]["Message"] . " - " . $current["error"]["Details"]];
         logModuleCall("domainnameapi", substr(__FUNCTION__, 14), $dna->getRequestData(), $dna->getResponseData(), $values);
