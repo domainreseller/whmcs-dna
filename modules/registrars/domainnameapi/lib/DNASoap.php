@@ -804,6 +804,9 @@ class DNASoap
     public function applyResourceRecords($domainName) { return $this->zoneNotSupported(); }
     public function setResourceRecordSet($domainName, $name, $type, array $contents, $ttl = 3600, $apply = true) { return $this->zoneNotSupported(); }
     public function deleteResourceRecordSet($domainName, $name, $type, $apply = true, $knownValue = '') { return $this->zoneNotSupported(); }
+    public function addResourceRecordValue($domainName, $name, $type, $value, $ttl = null, $apply = true) { return $this->zoneNotSupported(); }
+    public function removeResourceRecordValue($domainName, $name, $type, $value, $apply = true) { return $this->zoneNotSupported(); }
+    public function replaceResourceRecordValue($domainName, $name, $type, $oldValue, $newValue, $ttl = null, $apply = true) { return $this->zoneNotSupported(); }
 
     /**
      * URL forwarding lives on the REST gateway only (/domains/forwards).
