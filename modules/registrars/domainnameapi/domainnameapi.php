@@ -716,6 +716,82 @@ function domainnameapi_dns_relative_host($fqdn, $domain)
     return $fqdn;
 }
 
+/**
+ * Record types WHMCS can actually render in its DNS Management form.
+ *
+ * The gateway stores more (SRV, CAA, TLSA, DS, PTR, ALIAS, NAPTR) but WHMCS's
+ * type dropdown is fixed, so those never come back in $params["dnsrecords"].
+ * We therefore neither show nor touch them — showing them would let a save
+ * silently delete records the customer was never able to see.
+ */
+function domainnameapi_dns_managed_types()
+{
+    return ['A', 'AAAA', 'CNAME', 'MX', 'TXT'];
+}
+
+/**
+ * Is this a record the zone owns rather than the customer?
+ *
+ * SOA/NS are registry-managed (the zone API rejects NS writes outright), and
+ * enabling URL forwarding makes the gateway plant a "forward-verification" TXT
+ * at the apex which it also refuses to delete. Surfacing any of them would
+ * invite a save that tries — and fails — to remove them.
+ */
+function domainnameapi_dns_is_system_record($type, $content)
+{
+    if (in_array(strtoupper($type), ['SOA', 'NS'], true)) {
+        return true;
+    }
+    return strtoupper($type) === 'TXT' && stripos((string) $content, 'forward-verification') !== false;
+}
+
+/**
+ * Normalize a record value so "what the gateway stored" and "what the customer
+ * typed" compare equal: TXT comes back quoted, hostnames come back with the
+ * trailing root dot.
+ */
+function domainnameapi_dns_normalize_content($type, $content)
+{
+    $content = trim((string) $content);
+    if (strtoupper($type) === 'TXT') {
+        if (strlen($content) > 1 && $content[0] === '"' && substr($content, -1) === '"') {
+            $content = substr($content, 1, -1);
+        }
+        return $content;
+    }
+    return strtolower(rtrim($content, '.'));
+}
+
+/**
+ * Group flat records into resource-record SETS keyed by "host|type".
+ *
+ * The gateway models a zone as sets: one write per name+type carrying every
+ * value. Writing values one at a time overwrites the previous one, and deleting
+ * a single value removes the whole set — so the module has to think in sets too.
+ */
+function domainnameapi_dns_group_sets($records, $domain)
+{
+    $sets = [];
+    foreach ($records as $rec) {
+        $type = strtoupper($rec["Type"]);
+        if (domainnameapi_dns_is_system_record($type, $rec["Content"])) {
+            continue;
+        }
+        if (!in_array($type, domainnameapi_dns_managed_types(), true)) {
+            continue;
+        }
+
+        $host = domainnameapi_dns_relative_host($rec["Name"], $domain);
+        $key  = strtolower($host) . '|' . $type;
+
+        if (!isset($sets[$key])) {
+            $sets[$key] = ['host' => $host, 'type' => $type, 'ttl' => (int) $rec["TTL"], 'contents' => []];
+        }
+        $sets[$key]['contents'][] = (string) $rec["Content"];
+    }
+    return $sets;
+}
+
 function domainnameapi_GetDNS($params)
 {
     sleep(1);
@@ -728,8 +804,10 @@ function domainnameapi_GetDNS($params)
     if ($result["result"] == "OK") {
         foreach ($result["data"]["records"] as $rec) {
             $type = strtoupper($rec["Type"]);
-            // SOA/NS are managed by the registry zone itself, not editable here.
-            if (in_array($type, ['SOA', 'NS'])) {
+            if (domainnameapi_dns_is_system_record($type, $rec["Content"])) {
+                continue;
+            }
+            if (!in_array($type, domainnameapi_dns_managed_types(), true)) {
                 continue;
             }
 
@@ -743,12 +821,28 @@ function domainnameapi_GetDNS($params)
                     $address  = rtrim($parts[1], '.');
                 }
             }
+            if ($type === 'TXT') {
+                $address = domainnameapi_dns_normalize_content('TXT', $rec["Content"]);
+            }
 
             $values[] = [
                 'hostname' => domainnameapi_dns_relative_host($rec["Name"], $domain),
                 'type'     => $type,
                 'address'  => $address,
                 'priority' => $priority !== '' ? $priority : 'N/A',
+            ];
+        }
+
+        // URL / FRAME are not zone records — they are the gateway's domain
+        // forwarding service (/domains/forwards), surfaced here so the customer
+        // manages them from the same screen.
+        $fwd = $dna->GetForwarding($domain);
+        if ($fwd["result"] == "OK" && !empty($fwd["data"]["Enabled"])) {
+            $values[] = [
+                'hostname' => '',
+                'type'     => strcasecmp($fwd["data"]["ForwardType"], 'Frame') === 0 ? 'FRAME' : 'URL',
+                'address'  => $fwd["data"]["RedirectAddress"],
+                'priority' => 'N/A',
             ];
         }
     } else {
@@ -765,8 +859,8 @@ function domainnameapi_SaveDNS($params)
     $dna    = getDNAApi($params);
     $domain = $params["sld"] . "." . $params["tld"];
 
-    // Current state, so we only touch what actually changed (fewer API calls,
-    // and we never drop a record because a later add failed).
+    // Current state, so we only touch what actually changed and never drop a
+    // record the customer could not see in the form.
     $current = $dna->GetResourceRecords($domain);
     sleep(1);
     if ($current["result"] != "OK") {
@@ -775,70 +869,119 @@ function domainnameapi_SaveDNS($params)
         return $values;
     }
 
-    // Build a comparable "key => descriptor" map for the existing editable set.
-    $existing = [];
-    foreach ($current["data"]["records"] as $rec) {
-        $type = strtoupper($rec["Type"]);
-        if (in_array($type, ['SOA', 'NS'])) {
-            continue;
-        }
-        $host    = domainnameapi_dns_relative_host($rec["Name"], $domain);
-        $content = rtrim((string) $rec["Content"], '.');
-        $key     = strtolower($host) . '|' . $type . '|' . strtolower($content);
-        $existing[$key] = ['Name' => $rec["Name"], 'Content' => $rec["Content"], 'Type' => $type];
-    }
+    $existing = domainnameapi_dns_group_sets($current["data"]["records"], $domain);
 
-    // Desired state coming from the WHMCS DNS form.
-    $desired = [];
+    // Desired state from the WHMCS DNS form, grouped into sets the same way.
+    $desired  = [];
+    $forward  = null;
     foreach ((array) $params["dnsrecords"] as $rec) {
         $type = strtoupper(trim($rec["type"] ?? ''));
         $addr = trim($rec["address"] ?? '');
         if ($type === '' || $addr === '') {
             continue;
         }
+
+        if ($type === 'URL' || $type === 'FRAME') {
+            $forward = ['address' => $addr, 'type' => $type === 'FRAME' ? 'Frame' : 'Standard'];
+            continue;
+        }
+        if (!in_array($type, domainnameapi_dns_managed_types(), true)) {
+            continue;
+        }
+
         $host    = trim($rec["hostname"] ?? '');
         $host    = ($host === '@') ? '' : $host;
         $content = $addr;
         if ($type === 'MX' && isset($rec["priority"]) && $rec["priority"] !== '' && strtoupper($rec["priority"]) !== 'N/A') {
             $content = $rec["priority"] . ' ' . $addr;
         }
-        $key = strtolower($host) . '|' . $type . '|' . strtolower(rtrim($content, '.'));
-        $desired[$key] = ['host' => $host, 'type' => $type, 'content' => $content];
+        if ($type === 'TXT' && !(strlen($content) > 1 && $content[0] === '"' && substr($content, -1) === '"')) {
+            // The gateway quotes TXT values on read; quote on write so the two
+            // sides compare equal on the next save.
+            $content = '"' . $content . '"';
+        }
+
+        $key = strtolower($host) . '|' . $type;
+        if (!isset($desired[$key])) {
+            $desired[$key] = ['host' => $host, 'type' => $type, 'contents' => []];
+        }
+        $desired[$key]['contents'][] = $content;
     }
 
     $error   = null;
     $touched = false;
 
-    // Delete records that are no longer desired (apply deferred to the end).
-    foreach ($existing as $key => $rec) {
-        if (!isset($desired[$key])) {
-            $del = $dna->DeleteResourceRecord($domain, $rec["Name"], $rec["Content"], $rec["Type"], false);
-            $touched = true;
-            if ($del["result"] != "OK") {
-                $error = $del["error"];
-            }
+    // Write every set whose values changed. One call per set carrying ALL of
+    // its values — the gateway replaces the set, so a per-value loop here would
+    // keep only the last value written.
+    foreach ($desired as $key => $set) {
+        $want = array_map(function ($c) use ($set) {
+            return domainnameapi_dns_normalize_content($set['type'], $c);
+        }, $set['contents']);
+        sort($want);
+
+        $have = [];
+        if (isset($existing[$key])) {
+            $have = array_map(function ($c) use ($set) {
+                return domainnameapi_dns_normalize_content($set['type'], $c);
+            }, $existing[$key]['contents']);
+            sort($have);
+        }
+
+        if ($want === $have) {
+            continue;
+        }
+
+        // Keep the TTL the record already had; the WHMCS form has no TTL field,
+        // so a fixed default would silently reset it on every save.
+        $ttl = isset($existing[$key]) && $existing[$key]['ttl'] > 0 ? $existing[$key]['ttl'] : 3600;
+
+        $res     = $dna->SetResourceRecordSet($domain, $set['host'], $set['type'], $set['contents'], $ttl, false);
+        $touched = true;
+        if ($res["result"] != "OK") {
+            $error = $res["error"];
         }
     }
 
-    // Add records that are newly desired. The gateway appends the zone domain
-    // to the record name itself, so we send the RELATIVE host (e.g. "www"),
-    // never the FQDN — sending "www.example.com" would store it doubled as
-    // "www.example.com.example.com". Apex records use an empty name.
-    foreach ($desired as $key => $rec) {
-        if (!isset($existing[$key])) {
-            $add = $dna->AddResourceRecord($domain, $rec["host"], $rec["type"], $rec["content"], 3600, false);
-            $touched = true;
-            if ($add["result"] != "OK") {
-                $error = $add["error"];
-            }
+    // Remove sets the customer deleted entirely.
+    foreach ($existing as $key => $set) {
+        if (isset($desired[$key])) {
+            continue;
+        }
+        $res     = $dna->DeleteResourceRecordSet($domain, $set['host'], $set['type'], false, $set['contents'][0]);
+        $touched = true;
+        if ($res["result"] != "OK") {
+            $error = $res["error"];
         }
     }
 
-    // Commit staged changes once.
+    // Commit staged zone changes once.
     if ($touched) {
         $apply = $dna->ApplyResourceRecords($domain);
         if ($apply["result"] != "OK") {
             $error = $apply["error"];
+        }
+    }
+
+    // Forwarding is a separate service, applied after the zone work.
+    $currentFwd = $dna->GetForwarding($domain);
+    if ($currentFwd["result"] == "OK") {
+        $isOn = !empty($currentFwd["data"]["Enabled"]);
+        if ($forward) {
+            $same = $isOn
+                && strcasecmp($currentFwd["data"]["RedirectAddress"], $forward['address']) === 0
+                && strcasecmp($currentFwd["data"]["ForwardType"], $forward['type']) === 0;
+            if (!$same) {
+                $res = $dna->SetForwarding($domain, $forward['address'], $forward['type']);
+                if ($res["result"] != "OK") {
+                    $error = $res["error"];
+                }
+            }
+        } elseif ($isOn) {
+            $res = $dna->DeleteForwarding($domain);
+            if ($res["result"] != "OK") {
+                $error = $res["error"];
+            }
         }
     }
 
