@@ -242,6 +242,36 @@ class DomainNameAPI_PHPLibrary
     public function applyResourceRecords($domainName) { return $this->client->applyResourceRecords($domainName); }
 
     /**
+     * Replace a whole resource-record set (name + type) in one call.
+     * @see DNARest::setResourceRecordSet()
+     */
+    public function setResourceRecordSet($domainName, $name, $type, array $contents, $ttl = 3600, $apply = true) { return $this->client->setResourceRecordSet($domainName, $name, $type, $contents, $ttl, $apply); }
+
+    /**
+     * Remove every value under a name + type.
+     * @see DNARest::deleteResourceRecordSet()
+     */
+    public function deleteResourceRecordSet($domainName, $name, $type, $apply = true, $knownValue = '') { return $this->client->deleteResourceRecordSet($domainName, $name, $type, $apply, $knownValue); }
+
+    /**
+     * Read URL forwarding configuration.
+     * @see DNARest::getForwarding()
+     */
+    public function getForwarding($domainName) { return $this->client->getForwarding($domainName); }
+
+    /**
+     * Point the domain at a URL ('Standard' redirect or 'Frame' masked).
+     * @see DNARest::setForwarding()
+     */
+    public function setForwarding($domainName, $redirectAddress, $forwardType = 'Standard') { return $this->client->setForwarding($domainName, $redirectAddress, $forwardType); }
+
+    /**
+     * Remove URL forwarding.
+     * @see DNARest::deleteForwarding()
+     */
+    public function deleteForwarding($domainName) { return $this->client->deleteForwarding($domainName); }
+
+    /**
      * @see DNASoap::getContacts()
      * @see DNARest::getContacts()
      */

@@ -1058,6 +1058,51 @@ class DNARest
     }
 
     /**
+     * Zone record types the gateway actually accepts.
+     *
+     * Not derivable from the swagger — it types `ZoneCreateDto.type` as a free
+     * string. This list was established by probing every candidate type against
+     * the live gateway (2026-08-09): the ones below were stored and read back,
+     * while NS ("An invalid IP address was specified" — NS is owned by the
+     * nameserver endpoints, not the zone) and SPF/DNAME/SSHFP/URI/HINFO/LOC
+     * (gateway-side "internal error") were rejected. Validating here turns an
+     * opaque 500 into an actionable message.
+     */
+    public const ZONE_RECORD_TYPES = [
+        'A', 'AAAA', 'ALIAS', 'CAA', 'CNAME', 'DS', 'MX', 'NAPTR', 'PTR', 'SRV', 'TLSA', 'TXT',
+    ];
+
+    /**
+     * Redirect types accepted by /domains/forwards.
+     * Established the same way — the gateway answers "Invalid redirect type"
+     * for anything else (301/302/Masked/Cloaking/... all rejected).
+     * Standard = plain redirect, Frame = masked/framed redirect.
+     */
+    public const FORWARD_TYPES = ['Standard', 'Frame'];
+
+    /**
+     * Reject a record type the gateway cannot store, before spending a call on it.
+     *
+     * @param string $type
+     * @return string|null Error message, or null when the type is supported
+     */
+    private function unsupportedZoneType($type)
+    {
+        $type = strtoupper(trim((string) $type));
+        if ($type === '') {
+            return 'Record type is required.';
+        }
+        if (!in_array($type, self::ZONE_RECORD_TYPES, true)) {
+            return sprintf(
+                'Record type "%s" is not supported by the DNS zone API. Supported types: %s.',
+                $type,
+                implode(', ', self::ZONE_RECORD_TYPES)
+            );
+        }
+        return null;
+    }
+
+    /**
      * List the DNS zone resource records for a domain.
      *
      * GET /domains/zones?domainName=... returns an array of resource-record
@@ -1130,6 +1175,10 @@ class DNARest
     public function addResourceRecord($domainName, $name, $type, $content, $ttl = 3600, $apply = true)
     {
         try {
+            if ($why = $this->unsupportedZoneType($type)) {
+                return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('ADD_ZONE', $why, $why)];
+            }
+
             $body     = ['zoneStruct' => $this->buildZoneStruct($name, $type, $content, $ttl)];
             $endpoint = 'domains/zones?' . http_build_query(['domainName' => $domainName]);
             $this->request('POST', $endpoint, $body);
@@ -1169,6 +1218,10 @@ class DNARest
     public function editResourceRecord($domainName, $recordName, $name, $type, $content, $ttl = 3600, $apply = true)
     {
         try {
+            if ($why = $this->unsupportedZoneType($type)) {
+                return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('EDIT_ZONE', $why, $why)];
+            }
+
             $body     = ['zoneStruct' => $this->buildZoneStruct($name, $type, $content, $ttl)];
             $endpoint = 'domains/zones?' . http_build_query(['domainName' => $domainName, 'recordName' => $recordName]);
             $this->request('PUT', $endpoint, $body);
@@ -1249,6 +1302,247 @@ class DNARest
             return [
                 'result' => self::$RESULT_ERROR,
                 'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'APPLY_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Replace an entire resource-record SET (name + type) with the given values.
+     *
+     * This is the operation the gateway actually models, and the one callers
+     * almost always want. Verified live (2026-08-09):
+     *
+     *  - a second add for the same name+type REPLACES the first instead of
+     *    appending, so adding values one by one silently drops all but the last;
+     *  - a delete naming a single value removes the WHOLE set, not that value.
+     *
+     * So a name+type must always be written in one call carrying every value it
+     * should end up with. Pass the full list; pass an empty list to remove the
+     * set entirely.
+     *
+     * @param string $domainName
+     * @param string $name     Relative label ('' for the zone apex; '@' is rejected by the gateway)
+     * @param string $type     One of self::ZONE_RECORD_TYPES
+     * @param array  $contents Every value the set should hold after the call
+     * @param int    $ttl      1..86400 seconds
+     * @param bool   $apply    Commit immediately (default true)
+     * @return array
+     */
+    public function setResourceRecordSet($domainName, $name, $type, array $contents, $ttl = 3600, $apply = true)
+    {
+        try {
+            if ($why = $this->unsupportedZoneType($type)) {
+                return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('SET_ZONE', $why, $why)];
+            }
+
+            $contents = array_values(array_filter(array_map('strval', $contents), function ($v) {
+                return trim($v) !== '';
+            }));
+
+            // No values left means "remove this set". Deleting by any single
+            // value drops the whole set, which is exactly what we want here.
+            if (empty($contents)) {
+                return $this->deleteResourceRecordSet($domainName, $name, $type, $apply);
+            }
+
+            // POST, not PUT: PUT only edits a set that already exists (a missing
+            // one answers ZoneClient:10006), while POST creates it when absent
+            // and overwrites every value when present — which is exactly the
+            // "make the set look like this" semantics we want here.
+            $body     = ['zoneStruct' => $this->buildZoneStruct($name, $type, $contents, $ttl)];
+            $endpoint = 'domains/zones?' . http_build_query(['domainName' => $domainName]);
+            $this->request('POST', $endpoint, $body);
+
+            if ($apply) {
+                $this->applyResourceRecords($domainName);
+            }
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => ['Name' => $name, 'Type' => strtoupper($type), 'TTL' => (int) $ttl, 'Contents' => $contents],
+            ];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'SET_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Remove a whole resource-record set (every value under name + type).
+     *
+     * The gateway's DELETE insists on a `Record` value even though the swagger
+     * marks it optional ("Zone kaydını silmek için 'Record' parametresi
+     * gereklidir"), but any one of the set's values removes all of them — so a
+     * current value is looked up when the caller does not supply one.
+     *
+     * @param string $domainName
+     * @param string $name      Relative label or the FQDN form returned by GET
+     * @param string $type
+     * @param bool   $apply
+     * @param string $knownValue Any current value, to save a lookup call
+     * @return array
+     */
+    public function deleteResourceRecordSet($domainName, $name, $type, $apply = true, $knownValue = '')
+    {
+        try {
+            $type  = strtoupper(trim((string) $type));
+            $value = (string) $knownValue;
+
+            if ($value === '') {
+                $current = $this->getResourceRecords($domainName);
+                if (($current['result'] ?? '') !== self::$RESULT_OK) {
+                    return $current;
+                }
+                $fqdn = $this->qualifyRecordName($name, $domainName);
+                foreach ($current['data']['records'] as $rec) {
+                    if (strcasecmp($rec['Name'], $fqdn) === 0 && strcasecmp($rec['Type'], $type) === 0) {
+                        $value = (string) $rec['Content'];
+                        break;
+                    }
+                }
+                if ($value === '') {
+                    // Nothing to remove — treat as success so callers stay idempotent.
+                    return ['result' => self::$RESULT_OK, 'data' => ['Name' => $name, 'Type' => $type, 'Removed' => false]];
+                }
+            }
+
+            return $this->deleteResourceRecord($domainName, $this->qualifyRecordName($name, $domainName), $value, $type, $apply);
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'DELETE_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Turn a relative label into the FQDN form the zone listing returns
+     * ("www" => "www.example.com."). Already-qualified names pass through, so
+     * callers can hand back whatever GET gave them.
+     *
+     * @param string $name
+     * @param string $domainName
+     * @return string
+     */
+    private function qualifyRecordName($name, $domainName)
+    {
+        $name   = trim((string) $name);
+        $domain = rtrim(strtolower(trim((string) $domainName)), '.');
+        $apex   = $domain . '.';
+
+        if ($name === '' || $name === '@') {
+            return $apex;
+        }
+        $bare = rtrim($name, '.');
+        if (strcasecmp($bare, $domain) === 0 || substr(strtolower($bare), -strlen('.' . $domain)) === '.' . $domain) {
+            return $bare . '.';
+        }
+        return $bare . '.' . $apex;
+    }
+
+    /**
+     * Read the domain's URL forwarding configuration.
+     *
+     * GET /domains/forwards answers "Redirect information not found" (an error,
+     * not an empty body) when nothing is configured, so that case is normalized
+     * into an OK envelope with Enabled=false.
+     *
+     * @param string $domainName
+     * @return array
+     */
+    public function getForwarding($domainName)
+    {
+        try {
+            $response = $this->request('GET', 'domains/forwards', ['domainName' => $domainName]);
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => [
+                    'Enabled'         => !empty($response['redirectAlias']),
+                    'RedirectAddress' => (string) ($response['redirectAlias'] ?? ''),
+                    'ForwardType'     => (string) ($response['redirectType'] ?? ''),
+                ],
+            ];
+        } catch (Exception $e) {
+            $raw = $this->lastResponse['raw_response'] ?? $e->getMessage();
+            if (stripos((string) $raw, 'not found') !== false || stripos($e->getMessage(), 'not found') !== false) {
+                return [
+                    'result' => self::$RESULT_OK,
+                    'data'   => ['Enabled' => false, 'RedirectAddress' => '', 'ForwardType' => ''],
+                ];
+            }
+
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'GET_FORWARD', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? $raw)
+            ];
+        }
+    }
+
+    /**
+     * Point the domain at a URL.
+     *
+     * @param string $domainName
+     * @param string $redirectAddress Target URL
+     * @param string $forwardType     'Standard' (plain redirect) or 'Frame' (masked)
+     * @return array
+     */
+    public function setForwarding($domainName, $redirectAddress, $forwardType = 'Standard')
+    {
+        try {
+            $type = ucfirst(strtolower(trim((string) $forwardType)));
+            if (!in_array($type, self::FORWARD_TYPES, true)) {
+                $why = sprintf('Forward type "%s" is not supported. Supported types: %s.',
+                    $forwardType, implode(', ', self::FORWARD_TYPES));
+                return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('SET_FORWARD', $why, $why)];
+            }
+            if (trim((string) $redirectAddress) === '') {
+                $why = 'Redirect address is required.';
+                return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('SET_FORWARD', $why, $why)];
+            }
+
+            $this->request('POST', 'domains/forwards', [
+                'domainName'      => $domainName,
+                'redirectAddress' => $redirectAddress,
+                'forwardType'     => $type,
+            ]);
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => ['RedirectAddress' => $redirectAddress, 'ForwardType' => $type],
+            ];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'SET_FORWARD', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Remove the domain's URL forwarding. Note the PascalCase query key the
+     * gateway requires here (`DomainName`), unlike the GET above.
+     *
+     * @param string $domainName
+     * @return array
+     */
+    public function deleteForwarding($domainName)
+    {
+        try {
+            $this->request('DELETE', 'domains/forwards', ['DomainName' => $domainName]);
+
+            return ['result' => self::$RESULT_OK, 'data' => ['DomainName' => $domainName]];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'DELETE_FORWARD', $e->getMessage(),
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
         }

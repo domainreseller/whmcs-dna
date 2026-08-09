@@ -802,6 +802,26 @@ class DNASoap
     public function editResourceRecord($domainName, $recordName, $name, $type, $content, $ttl = 3600, $apply = true) { return $this->zoneNotSupported(); }
     public function deleteResourceRecord($domainName, $name, $record, $recordType, $apply = true) { return $this->zoneNotSupported(); }
     public function applyResourceRecords($domainName) { return $this->zoneNotSupported(); }
+    public function setResourceRecordSet($domainName, $name, $type, array $contents, $ttl = 3600, $apply = true) { return $this->zoneNotSupported(); }
+    public function deleteResourceRecordSet($domainName, $name, $type, $apply = true, $knownValue = '') { return $this->zoneNotSupported(); }
+
+    /**
+     * URL forwarding lives on the REST gateway only (/domains/forwards).
+     * @return array
+     */
+    private function forwardNotSupported()
+    {
+        return [
+            'result' => self::$RESULT_ERROR,
+            'error'  => $this->setError('FORWARD_NOT_SUPPORTED',
+                'URL forwarding is not supported over the SOAP API',
+                'Use REST API credentials to manage URL forwarding.'),
+        ];
+    }
+
+    public function getForwarding($domainName) { return $this->forwardNotSupported(); }
+    public function setForwarding($domainName, $redirectAddress, $forwardType = 'Standard') { return $this->forwardNotSupported(); }
+    public function deleteForwarding($domainName) { return $this->forwardNotSupported(); }
 
     /**
      * Get contact information for a domain
