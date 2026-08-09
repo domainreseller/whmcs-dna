@@ -872,8 +872,9 @@ function domainnameapi_SaveDNS($params)
     $existing = domainnameapi_dns_group_sets($current["data"]["records"], $domain);
 
     // Desired state from the WHMCS DNS form, grouped into sets the same way.
-    $desired  = [];
-    $forward  = null;
+    $desired     = [];
+    $forward     = null;
+    $unsupported = [];
     foreach ((array) $params["dnsrecords"] as $rec) {
         $type = strtoupper(trim($rec["type"] ?? ''));
         $addr = trim($rec["address"] ?? '');
@@ -885,7 +886,11 @@ function domainnameapi_SaveDNS($params)
             $forward = ['address' => $addr, 'type' => $type === 'FRAME' ? 'Frame' : 'Standard'];
             continue;
         }
+        // Anything else the form offers but the gateway has no home for (MXE)
+        // is reported back instead of being dropped silently — the customer
+        // would otherwise believe the record was saved.
         if (!in_array($type, domainnameapi_dns_managed_types(), true)) {
+            $unsupported[$type] = true;
             continue;
         }
 
@@ -963,6 +968,12 @@ function domainnameapi_SaveDNS($params)
         }
     }
 
+    // The module log records only the LAST call, and the forwarding work below
+    // would otherwise bury the zone request that actually failed. Keep the zone
+    // exchange for the log before moving on.
+    $zoneRequest  = $dna->getRequestData();
+    $zoneResponse = $dna->getResponseData();
+
     // Forwarding is a separate service, applied after the zone work.
     $currentFwd = $dna->GetForwarding($domain);
     if ($currentFwd["result"] == "OK") {
@@ -974,20 +985,30 @@ function domainnameapi_SaveDNS($params)
             if (!$same) {
                 $res = $dna->SetForwarding($domain, $forward['address'], $forward['type']);
                 if ($res["result"] != "OK") {
-                    $error = $res["error"];
+                    $error        = $res["error"];
+                    $zoneRequest  = $dna->getRequestData();
+                    $zoneResponse = $dna->getResponseData();
                 }
             }
         } elseif ($isOn) {
             $res = $dna->DeleteForwarding($domain);
             if ($res["result"] != "OK") {
-                $error = $res["error"];
+                $error        = $res["error"];
+                $zoneRequest  = $dna->getRequestData();
+                $zoneResponse = $dna->getResponseData();
             }
         }
     }
 
-    $values = $error ? ["error" => $error["Message"] . " - " . $error["Details"]] : [];
+    $values = [];
+    if ($error) {
+        $values["error"] = $error["Message"] . " - " . $error["Details"];
+    } elseif ($unsupported) {
+        $values["error"] = 'These record types are not supported by this registrar and were not saved: '
+            . implode(', ', array_keys($unsupported)) . '.';
+    }
 
-    logModuleCall("domainnameapi", substr(__FUNCTION__, 14), $dna->getRequestData(), $dna->getResponseData(), $values);
+    logModuleCall("domainnameapi", substr(__FUNCTION__, 14), $zoneRequest, $zoneResponse, $values);
 
     return $values;
 }
