@@ -782,6 +782,28 @@ class DNASoap
     // CONTACT MANAGEMENT
 
     /**
+     * DNS zone resource-record management is only available on the REST gateway
+     * (/domains/zones). The SOAP endpoint exposes no equivalent operation, so
+     * these degrade to a clear RESULT_ERROR instead of a fatal "method not
+     * found" when a SOAP-routed client calls them.
+     */
+    private function zoneNotSupported()
+    {
+        return [
+            'result' => self::$RESULT_ERROR,
+            'error'  => $this->setError('ZONE_NOT_SUPPORTED',
+                'DNS zone management is not supported over the SOAP API',
+                'Use REST API credentials to manage DNS zone resource records.'),
+        ];
+    }
+
+    public function getResourceRecords($domainName) { return $this->zoneNotSupported(); }
+    public function addResourceRecord($domainName, $name, $type, $content, $ttl = 3600, $apply = true) { return $this->zoneNotSupported(); }
+    public function editResourceRecord($domainName, $recordName, $name, $type, $content, $ttl = 3600, $apply = true) { return $this->zoneNotSupported(); }
+    public function deleteResourceRecord($domainName, $name, $record, $recordType, $apply = true) { return $this->zoneNotSupported(); }
+    public function applyResourceRecords($domainName) { return $this->zoneNotSupported(); }
+
+    /**
      * Get contact information for a domain
      *
      * @param string $domainName Domain name to get contacts for

@@ -15,7 +15,7 @@
  *   - Normal username → DNASoap (SOAP API)
  *
  * @package DomainNameApi
- * @version 3.0.10
+ * @version 3.0.11
  */
 
 namespace DomainNameApi;
@@ -214,6 +214,32 @@ class DomainNameAPI_PHPLibrary
      * @see DNARest::modifyChildNameServer()
      */
     public function modifyChildNameServer($domainName, $nameServer, $ipAddress) { return $this->client->modifyChildNameServer($domainName, $nameServer, $ipAddress); }
+
+    /**
+     * DNS zone resource-record management (REST only).
+     * @see DNARest::getResourceRecords()
+     */
+    public function getResourceRecords($domainName) { return $this->client->getResourceRecords($domainName); }
+
+    /**
+     * @see DNARest::addResourceRecord()
+     */
+    public function addResourceRecord($domainName, $name, $type, $content, $ttl = 3600, $apply = true) { return $this->client->addResourceRecord($domainName, $name, $type, $content, $ttl, $apply); }
+
+    /**
+     * @see DNARest::editResourceRecord()
+     */
+    public function editResourceRecord($domainName, $recordName, $name, $type, $content, $ttl = 3600, $apply = true) { return $this->client->editResourceRecord($domainName, $recordName, $name, $type, $content, $ttl, $apply); }
+
+    /**
+     * @see DNARest::deleteResourceRecord()
+     */
+    public function deleteResourceRecord($domainName, $name, $record, $recordType, $apply = true) { return $this->client->deleteResourceRecord($domainName, $name, $record, $recordType, $apply); }
+
+    /**
+     * @see DNARest::applyResourceRecords()
+     */
+    public function applyResourceRecords($domainName) { return $this->client->applyResourceRecords($domainName); }
 
     /**
      * @see DNASoap::getContacts()

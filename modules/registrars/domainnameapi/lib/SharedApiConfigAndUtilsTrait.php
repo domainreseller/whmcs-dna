@@ -9,7 +9,7 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '3.0.9'; // Must be identical in both classes; update here if changed
+    public static $VERSION = '3.0.11'; // Must be identical in both classes; update here if changed
 
     public static $PERFORMANCE_SAMPLE_RATE = 40; // 2.5% (25 out of 1000)
     public static $RESULT_OK      = 'OK';
@@ -268,8 +268,14 @@ trait SharedApiConfigAndUtilsTrait
         if (isset(self::$DEFAULT_ERRORS[$code])) {
             $error = self::$DEFAULT_ERRORS[$code];
             $result["Code"] = $error['code'];
-            $result["Message"] = $error['message'];
-            $result["Details"] = $error['description'];
+            // Prefer the caller-supplied message/details (the real server error)
+            // and fall back to the predefined generic text only when none was
+            // given. Otherwise a recognised code (e.g. CREDENTIALS, or the
+            // DOMAIN_DETAILS/DOMAIN_LIST catch-block fallbacks) would overwrite
+            // the actual API explanation with a generic description, leaving the
+            // host module (and the reseller) with no idea why the call failed.
+            $result["Message"] = (trim((string)$message) !== '') ? $message : $error['message'];
+            $result["Details"] = (trim((string)$details) !== '') ? $details : $error['description'];
         } else {
             $result["Code"] = $code;
             $result["Message"] = $message;

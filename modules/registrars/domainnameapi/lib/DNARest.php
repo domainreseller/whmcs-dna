@@ -1058,6 +1058,229 @@ class DNARest
     }
 
     /**
+     * List the DNS zone resource records for a domain.
+     *
+     * GET /domains/zones?domainName=... returns an array of resource-record
+     * SETS ({ name, ttl, type, records:[{content,disabled}] }). We flatten it
+     * to one row per content value so callers get a simple record list.
+     *
+     * @param string $domainName
+     * @return array
+     */
+    public function getResourceRecords($domainName)
+    {
+        try {
+            $response = $this->request('GET', 'domains/zones', ['domainName' => $domainName]);
+
+            $records = [];
+            foreach ((array) $response as $set) {
+                if (!is_array($set)) {
+                    continue;
+                }
+                $name = $set['name'] ?? '';
+                $type = $set['type'] ?? '';
+                $ttl  = (int) ($set['ttl'] ?? 0);
+                $rows = $set['records'] ?? [];
+                if (!is_array($rows) || !$rows) {
+                    // A set with no records still describes a name/type pair.
+                    $records[] = ['Name' => $name, 'Type' => $type, 'TTL' => $ttl, 'Content' => '', 'Disabled' => false];
+                    continue;
+                }
+                foreach ($rows as $rec) {
+                    $records[] = [
+                        'Name'     => $name,
+                        'Type'     => $type,
+                        'TTL'      => $ttl,
+                        'Content'  => $rec['content'] ?? '',
+                        'Disabled' => !empty($rec['disabled']),
+                    ];
+                }
+            }
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => ['records' => $records],
+            ];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'GET_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Add a DNS zone resource record.
+     *
+     * POST /domains/zones?domainName=... with a ZoneCreateInput body. The
+     * domainName is a QUERY parameter while the record lives in the JSON body,
+     * so the query string is baked into the endpoint (request() only appends
+     * query params for GET/DELETE). Staged changes must be committed with
+     * applyResourceRecords().
+     *
+     * @param string $domainName
+     * @param string $name    Record label (e.g. "www", "@")
+     * @param string $type    Record type (A, AAAA, CNAME, MX, TXT, ...)
+     * @param string|array $content One value or a list of values for the record set
+     * @param int    $ttl     1..86400 seconds
+     * @param bool   $apply   Commit immediately (default true)
+     * @return array
+     */
+    public function addResourceRecord($domainName, $name, $type, $content, $ttl = 3600, $apply = true)
+    {
+        try {
+            $body     = ['zoneStruct' => $this->buildZoneStruct($name, $type, $content, $ttl)];
+            $endpoint = 'domains/zones?' . http_build_query(['domainName' => $domainName]);
+            $this->request('POST', $endpoint, $body);
+
+            if ($apply) {
+                $this->applyResourceRecords($domainName);
+            }
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => ['Name' => $name, 'Type' => $type, 'TTL' => (int) $ttl, 'Content' => $content],
+            ];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'ADD_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Edit an existing DNS zone resource record.
+     *
+     * PUT /domains/zones?domainName=...&recordName=... with a ZoneCreateInput
+     * body describing the new state of the record identified by $recordName.
+     *
+     * @param string $domainName
+     * @param string $recordName Current record label being edited
+     * @param string $name    New record label (usually same as $recordName)
+     * @param string $type    Record type
+     * @param string|array $content New value(s)
+     * @param int    $ttl
+     * @param bool   $apply
+     * @return array
+     */
+    public function editResourceRecord($domainName, $recordName, $name, $type, $content, $ttl = 3600, $apply = true)
+    {
+        try {
+            $body     = ['zoneStruct' => $this->buildZoneStruct($name, $type, $content, $ttl)];
+            $endpoint = 'domains/zones?' . http_build_query(['domainName' => $domainName, 'recordName' => $recordName]);
+            $this->request('PUT', $endpoint, $body);
+
+            if ($apply) {
+                $this->applyResourceRecords($domainName);
+            }
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => ['Name' => $name, 'Type' => $type, 'TTL' => (int) $ttl, 'Content' => $content],
+            ];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'EDIT_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Delete a DNS zone resource record.
+     *
+     * DELETE /domains/zones takes everything as QUERY parameters. Note the
+     * mixed casing dictated by the gateway: domainName is camelCase while
+     * Name/Record/RecordType are PascalCase — they are matched literally.
+     *
+     * @param string $domainName
+     * @param string $name       Record label
+     * @param string $record     The record content/value being removed
+     * @param string $recordType Record type (A, MX, ...)
+     * @param bool   $apply
+     * @return array
+     */
+    public function deleteResourceRecord($domainName, $name, $record, $recordType, $apply = true)
+    {
+        try {
+            $this->request('DELETE', 'domains/zones', [
+                'domainName' => $domainName,
+                'Name'       => $name,
+                'Record'     => $record,
+                'RecordType' => $recordType,
+            ]);
+
+            if ($apply) {
+                $this->applyResourceRecords($domainName);
+            }
+
+            return [
+                'result' => self::$RESULT_OK,
+                'data'   => ['Name' => $name, 'Type' => $recordType, 'Content' => $record],
+            ];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'DELETE_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Commit staged DNS zone changes for a domain.
+     * POST /domains/zones/apply?domainName=...
+     *
+     * @param string $domainName
+     * @return array
+     */
+    public function applyResourceRecords($domainName)
+    {
+        try {
+            $endpoint = 'domains/zones/apply?' . http_build_query(['domainName' => $domainName]);
+            $this->request('POST', $endpoint, []);
+
+            return ['result' => self::$RESULT_OK, 'data' => ['DomainName' => $domainName]];
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'APPLY_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Build a ZoneCreateDto payload from loose arguments.
+     * @param string $name
+     * @param string $type
+     * @param string|array $content
+     * @param int $ttl
+     * @return array
+     */
+    private function buildZoneStruct($name, $type, $content, $ttl)
+    {
+        $ttl = (int) $ttl;
+        if ($ttl < 1) {
+            $ttl = 3600;
+        }
+        if ($ttl > 86400) {
+            $ttl = 86400;
+        }
+
+        return [
+            'name'     => (string) $name,
+            'ttl'      => $ttl,
+            'type'     => strtoupper((string) $type),
+            'contents' => array_values(array_map('strval', (array) $content)),
+        ];
+    }
+
+    /**
      * Get contact information for a domain
      * @param string $domainName
      * @return array
@@ -1789,26 +2012,98 @@ class DNARest
         if (is_array($phone)) { $phoneCc = $phone['Phone']['CountryCode'] ?? ''; $phone = $phone['Phone']['Number'] ?? ''; }
         if (is_array($fax)) { $faxCc = $fax['Fax']['CountryCode'] ?? ''; $fax = $fax['Fax']['Number'] ?? ''; }
 
+        // Every required field the gateway checks is completed here, so both
+        // the flat and the nested input shapes end up equally valid.
+        $validated = $this->validateContact([
+            'FirstName'        => $contact['FirstName'] ?? '',
+            'LastName'         => $contact['LastName'] ?? '',
+            'AddressLine1'     => $address,
+            'City'             => $contact['City'] ?? ($contact['Address']['City'] ?? ''),
+            'State'            => $contact['State'] ?? ($contact['Address']['State'] ?? ''),
+            'Country'          => $contact['Country'] ?? ($contact['Address']['Country'] ?? ''),
+            'ZipCode'          => $contact['ZipCode'] ?? ($contact['Address']['ZipCode'] ?? ''),
+            'Phone'            => $phone,
+            'PhoneCountryCode' => $phoneCc,
+            'Fax'              => $fax,
+            'FaxCountryCode'   => $faxCc,
+        ]);
+
         return [
             'contactType'      => $apiType,
-            'firstName'        => $contact['FirstName'] ?? '',
-            'lastName'         => $contact['LastName'] ?? '',
+            'firstName'        => $validated['FirstName'],
+            'lastName'         => $validated['LastName'],
             'companyName'      => $contact['Company'] ?? '',
             'eMail'            => $contact['EMail'] ?? '',
-            'address'          => $address,
-            'city'             => $contact['City'] ?? ($contact['Address']['City'] ?? ''),
-            'state'            => $contact['State'] ?? ($contact['Address']['State'] ?? ''),
-            'country'          => $this->normalizeCountryCode($contact['Country'] ?? ($contact['Address']['Country'] ?? '')),
-            'postalCode'       => $contact['ZipCode'] ?? ($contact['Address']['ZipCode'] ?? ''),
-            'phoneCountryCode' => (string)$phoneCc,
-            'phone'            => (string)$phone,
-            'faxCountryCode'   => (string)$faxCc,
-            'fax'              => (string)$fax,
+            'address'          => $validated['AddressLine1'],
+            'city'             => $validated['City'],
+            'state'            => $validated['State'],
+            'country'          => $validated['Country'],
+            'postalCode'       => $validated['ZipCode'],
+            'phoneCountryCode' => $validated['PhoneCountryCode'],
+            'phone'            => $validated['Phone'],
+            'faxCountryCode'   => $validated['FaxCountryCode'],
+            'fax'              => $validated['Fax'],
             // Required non-nullable bool in the gateway ContactLiteDto. The
             // backend's own example payload includes it; omitting causes
             // ModelState validation to reject the whole registration.
             'isHidden'         => (bool)($contact['IsHidden'] ?? false),
         ];
+    }
+
+    /**
+     * Split a free-form phone/fax number into (subscriber number, country code).
+     *
+     * REST-ONLY — DNASoap keeps its own validateContact() logic untouched.
+     * The gateway caps `phone` at 16 characters and expects the country code in
+     * its own field, so anything the caller pasted in ("+90 5323743388",
+     * "0532 374 33 88") has to be reduced to digits and stripped of the dial
+     * prefix. An empty number is left alone: fabricating a country code for a
+     * blank fax field would only create a new validation error.
+     *
+     * @param string $number
+     * @param string $countryCode
+     * @return array{0:string,1:string} [number, countryCode]
+     */
+    private function normalizePhone($number, $countryCode)
+    {
+        $hasIntlPrefix = (bool) preg_match('/^\s*(\+|00)/', (string) $number);
+        $digits        = preg_replace('/\D/', '', (string) $number);
+        $cc            = preg_replace('/\D/', '', (string) $countryCode);
+
+        if ($digits === '') {
+            return ['', $cc];
+        }
+
+        if ($hasIntlPrefix) {
+            // "00" international prefix is equivalent to a leading "+".
+            if (strpos($digits, '00') === 0) {
+                $digits = substr($digits, 2);
+            }
+            if ($cc !== '' && strpos($digits, $cc) === 0 && strlen($digits) > strlen($cc)) {
+                $digits = substr($digits, strlen($cc));
+            }
+        } elseif ($cc !== '' && strpos($digits, $cc) === 0 && strlen($digits) > 10) {
+            // No "+", but the code is repeated at the front: "905323743388"/"90".
+            $digits = substr($digits, strlen($cc));
+        }
+
+        if ($cc === '') {
+            // Recover a Turkish country code the caller left out; otherwise fall
+            // back to the library default, same as DNASoap::validateContact().
+            if (strlen($digits) === 12 && strpos($digits, '90') === 0) {
+                $cc     = '90';
+                $digits = substr($digits, 2);
+            } else {
+                $cc = '90';
+            }
+        }
+
+        // National trunk prefix ("0532...") is not part of the E.164 number.
+        if (strlen($digits) > 1 && $digits[0] === '0') {
+            $digits = ltrim($digits, '0');
+        }
+
+        return [$digits, $cc];
     }
 
     /**
@@ -1872,7 +2167,19 @@ class DNARest
     }
 
     /**
-     * Validate and normalize contact information
+     * Validate and normalize contact information.
+     *
+     * Mirrors DNASoap::validateContact() — a contact that the reseller's panel
+     * left half-empty is completed with placeholders instead of failing the
+     * whole registration — and additionally covers what the REST gateway
+     * validates but the SOAP one did not:
+     *
+     *  - `State` is required ("Registrant State is required."); SOAP never sent
+     *    a default, so it falls back to the city.
+     *  - First/last name "cannot contain numeric or special characters", so
+     *    digits and punctuation are stripped before sending.
+     *  - `Phone` is capped at 16 chars with the country code in its own field
+     *    (see normalizePhone()).
      *
      * @param array $contact Contact data to validate
      * @return array Validated contact information
@@ -1885,6 +2192,7 @@ class DNARest
             "LastName"         => "Isimyok",
             "AddressLine1"     => "Addres yok",
             "City"             => "ISTANBUL",
+            "State"            => "ISTANBUL",
             "Country"          => "TR",
             "ZipCode"          => "34000",
             "Phone"            => "5555555555",
@@ -1897,6 +2205,11 @@ class DNARest
                 $contact[$key] = $value;
             }
         }
+
+        // Names: strip what the gateway rejects, then fall back to the default
+        // if nothing printable survived (e.g. a name that was only digits).
+        $contact["FirstName"] = $this->sanitizePersonName($contact["FirstName"]);
+        $contact["LastName"]  = $this->sanitizePersonName($contact["LastName"]);
 
         // Check empty values and fill with defaults
         if (strlen(trim($contact["FirstName"])) == 0) {
@@ -1911,6 +2224,12 @@ class DNARest
         if (strlen(trim($contact["City"])) == 0) {
             $contact["City"] = $defaults["City"];
         }
+        // Most panels have no separate state field; the city is a truthful
+        // stand-in, unlike a hardcoded province.
+        if (strlen(trim($contact["State"])) == 0) {
+            $contact["State"] = $contact["City"];
+        }
+        $contact["Country"] = $this->normalizeCountryCode($contact["Country"]);
         if (strlen(trim($contact["Country"])) == 0) {
             $contact["Country"] = $defaults["Country"];
         }
@@ -1919,20 +2238,9 @@ class DNARest
         }
 
         // Phone number processing
-        $tmpPhone = isset($contact["Phone"]) ? preg_replace('/[^0-9]/', '', $contact["Phone"]) : '';
-        if (strlen($tmpPhone) == 10) {
-            $contact["PhoneCountryCode"] = '';
-            $contact["Phone"]            = $tmpPhone;
-        } elseif (strlen($tmpPhone) == 11 && substr($tmpPhone, 0, 1) == '9') {
-            $contact["PhoneCountryCode"] = substr($tmpPhone, 0, 2);
-            $contact["Phone"]            = substr($tmpPhone, 2);
-        } elseif (strlen($tmpPhone) == 12 && substr($tmpPhone, 0, 2) == '90') {
-            $contact["PhoneCountryCode"] = substr($tmpPhone, 0, 2);
-            $contact["Phone"]            = substr($tmpPhone, 2);
-        } else {
-            $contact["PhoneCountryCode"] = $defaults["PhoneCountryCode"];
-            $contact["Phone"]            = $tmpPhone ?: $defaults["Phone"];
-        }
+        list($phone, $phoneCc)   = $this->normalizePhone($contact["Phone"], $contact["PhoneCountryCode"]);
+        $contact["Phone"]            = $phone;
+        $contact["PhoneCountryCode"] = $phoneCc;
 
         if (strlen(trim($contact["PhoneCountryCode"])) == 0) {
             $contact["PhoneCountryCode"] = $defaults["PhoneCountryCode"];
@@ -1941,6 +2249,31 @@ class DNARest
             $contact["Phone"] = $defaults["Phone"];
         }
 
+        // Fax is optional for the gateway — normalize it when present, but
+        // never invent one, and never leave a country code on an empty number.
+        list($fax, $faxCc) = $this->normalizePhone($contact["Fax"] ?? '', $contact["FaxCountryCode"] ?? '');
+        $contact["Fax"]            = $fax;
+        $contact["FaxCountryCode"] = $fax === '' ? '' : $faxCc;
+
         return $contact;
+    }
+
+    /**
+     * Strip everything the gateway rejects in a person name: "FirstName cannot
+     * contain numeric or special characters." Letters (any alphabet, so Turkish
+     * characters survive), spaces, hyphens and apostrophes are kept.
+     *
+     * @param string $name
+     * @return string
+     */
+    private function sanitizePersonName($name)
+    {
+        $clean = preg_replace('/[^\p{L}\s\'\-]/u', '', (string) $name);
+        if ($clean === null) {
+            // Invalid UTF-8 — fall back to an ASCII-only pass.
+            $clean = preg_replace('/[^a-zA-Z\s\'\-]/', '', (string) $name);
+        }
+
+        return trim(preg_replace('/\s+/u', ' ', $clean));
     }
 } 
