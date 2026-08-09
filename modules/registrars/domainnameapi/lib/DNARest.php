@@ -358,6 +358,8 @@ class DNARest
      */
     private function request($method, $endpoint, $data = [])
     {
+        $this->paceZoneRequest($endpoint);
+
         $parsedResponse     = [];
         $this->lastFunction = __FUNCTION__ . ':' . $method . ' ' . $endpoint;
 
@@ -1058,6 +1060,45 @@ class DNARest
     }
 
     /**
+     * When the last /domains/zones call went out, as a float timestamp.
+     * @var float
+     */
+    private $lastZoneRequestAt = 0.0;
+
+    /**
+     * Minimum gap between two zone calls, in seconds.
+     */
+    private const ZONE_MIN_INTERVAL = 1.0;
+
+    /**
+     * Keep consecutive zone calls at least a second apart.
+     *
+     * One user action on a DNS screen is several calls — read the zone, write a
+     * set, apply — and the gateway answers HTTP 429 to a burst of roughly four
+     * or five. Waiting only when the previous zone call was less than a second
+     * ago costs nothing for naturally spaced traffic, and everything outside
+     * /domains/zones is left at full speed.
+     *
+     * @param string $endpoint
+     * @return void
+     */
+    private function paceZoneRequest($endpoint)
+    {
+        if (strpos(ltrim((string) $endpoint, '/'), 'domains/zones') !== 0) {
+            return;
+        }
+
+        if ($this->lastZoneRequestAt > 0.0) {
+            $wait = self::ZONE_MIN_INTERVAL - (microtime(true) - $this->lastZoneRequestAt);
+            if ($wait > 0) {
+                usleep((int) ($wait * 1000000));
+            }
+        }
+
+        $this->lastZoneRequestAt = microtime(true);
+    }
+
+    /**
      * Zone record types the gateway actually accepts.
      *
      * Not derivable from the swagger — it types `ZoneCreateDto.type` as a free
@@ -1079,6 +1120,41 @@ class DNARest
      * Standard = plain redirect, Frame = masked/framed redirect.
      */
     public const FORWARD_TYPES = ['Standard', 'Frame'];
+
+    /**
+     * Reduce a record name to the RELATIVE label the gateway expects.
+     *
+     * Callers hand us whatever their panel had on screen: "@" (rejected by the
+     * gateway with "contains unsupported characters"), the zone apex itself, or
+     * a full "www.example.com" — which the gateway would happily store as
+     * "www.example.com.example.com." because it appends the zone name itself.
+     * Everything ends up as the bare label, and the apex as an empty string.
+     *
+     * @param string $name
+     * @param string $domainName
+     * @return string
+     */
+    private function relativizeRecordName($name, $domainName)
+    {
+        $name   = trim((string) $name);
+        $domain = rtrim(strtolower(trim((string) $domainName)), '.');
+
+        if ($name === '' || $name === '@') {
+            return '';
+        }
+
+        $bare = rtrim($name, '.');
+        if (strcasecmp($bare, $domain) === 0) {
+            return '';
+        }
+
+        $suffix = '.' . $domain;
+        if (strlen($bare) > strlen($suffix) && strcasecmp(substr($bare, -strlen($suffix)), $suffix) === 0) {
+            return substr($bare, 0, -strlen($suffix));
+        }
+
+        return $bare;
+    }
 
     /**
      * Reject a record type the gateway cannot store, before spending a call on it.
@@ -1179,6 +1255,7 @@ class DNARest
                 return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('ADD_ZONE', $why, $why)];
             }
 
+            $name     = $this->relativizeRecordName($name, $domainName);
             $body     = ['zoneStruct' => $this->buildZoneStruct($name, $type, $content, $ttl)];
             $endpoint = 'domains/zones?' . http_build_query(['domainName' => $domainName]);
             $this->request('POST', $endpoint, $body);
@@ -1222,6 +1299,7 @@ class DNARest
                 return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('EDIT_ZONE', $why, $why)];
             }
 
+            $name     = $this->relativizeRecordName($name, $domainName);
             $body     = ['zoneStruct' => $this->buildZoneStruct($name, $type, $content, $ttl)];
             $endpoint = 'domains/zones?' . http_build_query(['domainName' => $domainName, 'recordName' => $recordName]);
             $this->request('PUT', $endpoint, $body);
@@ -1336,6 +1414,7 @@ class DNARest
                 return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('SET_ZONE', $why, $why)];
             }
 
+            $name     = $this->relativizeRecordName($name, $domainName);
             $contents = array_values(array_filter(array_map('strval', $contents), function ($v) {
                 return trim($v) !== '';
             }));
@@ -1418,6 +1497,235 @@ class DNARest
                     $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
             ];
         }
+    }
+
+    /**
+     * Add ONE value to a resource-record set, keeping the values already there.
+     *
+     * Panels (WHMCS, WISECP, …) expose DNS as a list of individual records, but
+     * the gateway replaces a whole name+type on every write — so "add a second
+     * MX" has to be read-merge-write, not a bare POST. That is what this does.
+     * Adding a value the set already holds is a no-op, so retries are safe.
+     *
+     * @param string $domainName
+     * @param string $name  Relative label ('' or '@' for the apex)
+     * @param string $type
+     * @param string $value
+     * @param int|null $ttl Keep the set's current TTL when null
+     * @param bool $apply
+     * @return array
+     */
+    public function addResourceRecordValue($domainName, $name, $type, $value, $ttl = null, $apply = true)
+    {
+        try {
+            if ($why = $this->unsupportedZoneType($type)) {
+                return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('ADD_ZONE', $why, $why)];
+            }
+
+            $name = $this->relativizeRecordName($name, $domainName);
+            $set  = $this->readResourceRecordSet($domainName, $name, $type);
+            if (isset($set['result'])) {
+                return $set; // error envelope from the read
+            }
+
+            foreach ($set['contents'] as $existing) {
+                if ($this->sameRecordValue($type, $existing, $value)) {
+                    // Already present — report success without touching the zone.
+                    return [
+                        'result' => self::$RESULT_OK,
+                        'data'   => ['Name' => $name, 'Type' => strtoupper($type), 'Contents' => $set['contents'], 'Changed' => false],
+                    ];
+                }
+            }
+
+            $contents   = $set['contents'];
+            $contents[] = (string) $value;
+
+            return $this->setResourceRecordSet($domainName, $name, $type, $contents,
+                $ttl !== null ? $ttl : ($set['ttl'] ?: 3600), $apply);
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'ADD_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Remove ONE value from a resource-record set, leaving the rest in place.
+     *
+     * A bare DELETE would take the whole set with it, so the set is rewritten
+     * without the value instead — and only actually deleted when that value was
+     * the last one. Removing something already gone is a no-op.
+     *
+     * @param string $domainName
+     * @param string $name
+     * @param string $type
+     * @param string $value
+     * @param bool $apply
+     * @return array
+     */
+    public function removeResourceRecordValue($domainName, $name, $type, $value, $apply = true)
+    {
+        try {
+            if ($why = $this->unsupportedZoneType($type)) {
+                return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('DELETE_ZONE', $why, $why)];
+            }
+
+            $name = $this->relativizeRecordName($name, $domainName);
+            $set  = $this->readResourceRecordSet($domainName, $name, $type);
+            if (isset($set['result'])) {
+                return $set;
+            }
+
+            $remaining = [];
+            $found     = false;
+            foreach ($set['contents'] as $existing) {
+                if (!$found && $this->sameRecordValue($type, $existing, $value)) {
+                    $found = true;
+                    continue;
+                }
+                $remaining[] = $existing;
+            }
+
+            if (!$found) {
+                return [
+                    'result' => self::$RESULT_OK,
+                    'data'   => ['Name' => $name, 'Type' => strtoupper($type), 'Contents' => $set['contents'], 'Changed' => false],
+                ];
+            }
+
+            if (empty($remaining)) {
+                return $this->deleteResourceRecordSet($domainName, $name, $type, $apply, (string) $value);
+            }
+
+            return $this->setResourceRecordSet($domainName, $name, $type, $remaining, $set['ttl'] ?: 3600, $apply);
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'DELETE_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Swap ONE value of a resource-record set for another, keeping the others.
+     *
+     * This is the "edit this row" a panel offers. Editing through a plain PUT
+     * would replace the whole set with the single edited value and drop its
+     * siblings, so the set is rewritten with just that one value substituted.
+     *
+     * @param string $domainName
+     * @param string $name
+     * @param string $type
+     * @param string $oldValue Value currently stored (as the listing showed it)
+     * @param string $newValue
+     * @param int|null $ttl Keep the set's current TTL when null
+     * @param bool $apply
+     * @return array
+     */
+    public function replaceResourceRecordValue($domainName, $name, $type, $oldValue, $newValue, $ttl = null, $apply = true)
+    {
+        try {
+            if ($why = $this->unsupportedZoneType($type)) {
+                return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('EDIT_ZONE', $why, $why)];
+            }
+
+            $name = $this->relativizeRecordName($name, $domainName);
+            $set  = $this->readResourceRecordSet($domainName, $name, $type);
+            if (isset($set['result'])) {
+                return $set;
+            }
+
+            $contents = [];
+            $found    = false;
+            foreach ($set['contents'] as $existing) {
+                if (!$found && $this->sameRecordValue($type, $existing, $oldValue)) {
+                    $found      = true;
+                    $contents[] = (string) $newValue;
+                    continue;
+                }
+                $contents[] = $existing;
+            }
+
+            if (!$found) {
+                $why = sprintf('No %s record "%s" with value "%s" to edit.', strtoupper($type), $name, $oldValue);
+                return ['result' => self::$RESULT_ERROR, 'error' => $this->setError('EDIT_ZONE', $why, $why)];
+            }
+
+            return $this->setResourceRecordSet($domainName, $name, $type, $contents,
+                $ttl !== null ? $ttl : ($set['ttl'] ?: 3600), $apply);
+        } catch (Exception $e) {
+            return [
+                'result' => self::$RESULT_ERROR,
+                'error'  => $this->setError($this->formatErrorCode($e->getCode()) ?: 'EDIT_ZONE', $e->getMessage(),
+                    $this->lastParsedResponse['Details'] ?? ($this->lastResponse['raw_response'] ?? $e->getMessage()))
+            ];
+        }
+    }
+
+    /**
+     * Read one resource-record set. Returns ['ttl' => int, 'contents' => array]
+     * — an absent set is an empty one — or the read's error envelope, which the
+     * caller recognizes by its 'result' key.
+     *
+     * @param string $domainName
+     * @param string $name
+     * @param string $type
+     * @return array
+     */
+    private function readResourceRecordSet($domainName, $name, $type)
+    {
+        $current = $this->getResourceRecords($domainName);
+        if (($current['result'] ?? '') !== self::$RESULT_OK) {
+            return $current;
+        }
+
+        $fqdn     = $this->qualifyRecordName($name, $domainName);
+        $type     = strtoupper(trim((string) $type));
+        $contents = [];
+        $ttl      = 0;
+
+        foreach ($current['data']['records'] as $rec) {
+            if (strcasecmp($rec['Name'], $fqdn) !== 0 || strcasecmp($rec['Type'], $type) !== 0) {
+                continue;
+            }
+            if ((string) $rec['Content'] !== '') {
+                $contents[] = (string) $rec['Content'];
+            }
+            $ttl = (int) $rec['TTL'];
+        }
+
+        return ['ttl' => $ttl, 'contents' => $contents];
+    }
+
+    /**
+     * Do two record values mean the same thing? The gateway hands back TXT
+     * quoted and host targets with a trailing dot, while panels submit them
+     * bare, so a plain string compare would miss the match and duplicate the
+     * record.
+     *
+     * @param string $type
+     * @param string $a
+     * @param string $b
+     * @return bool
+     */
+    private function sameRecordValue($type, $a, $b)
+    {
+        $normalize = function ($v) use ($type) {
+            $v = trim((string) $v);
+            if (strtoupper($type) === 'TXT') {
+                if (strlen($v) > 1 && $v[0] === '"' && substr($v, -1) === '"') {
+                    $v = substr($v, 1, -1);
+                }
+                return $v;
+            }
+            return strtolower(rtrim($v, '.'));
+        };
+
+        return $normalize($a) === $normalize($b);
     }
 
     /**
