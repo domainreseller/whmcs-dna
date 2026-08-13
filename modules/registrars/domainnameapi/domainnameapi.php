@@ -306,41 +306,25 @@ function domainnameapi_GetRegistrarLock($params) {
 
 function domainnameapi_SaveRegistrarLock($params) {
 
-    $dna = getDNAApi($params);
+    $dna    = getDNAApi($params);
+    $domain = $params["sld"] . "." . $params["tld"];
 
-    $values=[];
+    $values = [];
 
-    // Get current lock status from registrar, Process request
-    $result = $dna->GetDetails($params["sld"].".".$params["tld"]);
+    // WHMCS tells us the state the customer asked for; act on that. Reading the
+    // registrar's current state and flipping it — as this did — turns the save
+    // into a toggle: saving the form without changing the switch reverses the
+    // lock, and a stale panel does the exact opposite of what was requested.
+    $wanted = strtolower(trim((string) ($params["lockenabled"] ?? '')));
+    $lock   = ($wanted === 'locked' || $wanted === '1' || $wanted === 'true' || $wanted === 'on');
 
+    $result = $lock
+        ? $dna->EnableTheftProtectionLock($domain)
+        : $dna->DisableTheftProtectionLock($domain);
 
-    if($result["result"] == "OK") {
-        if(isset($result["data"]["LockStatus"])) {
-            if($result["data"]["LockStatus"] == "true")
-            {
-                $kilit = "locked";
-            } else {
-                $kilit = "unlocked";
-            }
-
-            if($kilit == "unlocked") {
-                // Process request
-                $result = $dna->EnableTheftProtectionLock($params["sld"].".".$params["tld"]);
-            } else {
-                // Process request
-                $result = $dna->DisableTheftProtectionLock($params["sld"].".".$params["tld"]);
-            }
-
-            if($result["result"] == "OK") {
-                $values = ["success" => true];
-            } else {
-                $values["error"] = $result["error"]["Message"] . " - " . $result["error"]["Details"];
-            }
-
-        }
-    }
-    else
-    {
+    if ($result["result"] == "OK") {
+        $values = ["success" => true];
+    } else {
         $values["error"] = $result["error"]["Message"] . " - " . $result["error"]["Details"];
     }
 
