@@ -908,8 +908,10 @@ class DNARest
     public function enableTheftProtectionLock($domainName)
     {
         try {
-            $data     = ['domainName' => $domainName, 'lockStatus' => true];
-            $response = $this->request('POST', 'domains/lock', $data);
+            // Locking and unlocking are separate endpoints; the body carries the
+            // domain only (DomainLockInput). A `lockStatus` field is not part of
+            // the schema and is ignored, so the endpoint IS the instruction.
+            $this->request('POST', 'domains/lock', ['domainName' => $domainName]);
 
             return [
                 'result' => self::$RESULT_OK,
@@ -934,8 +936,11 @@ class DNARest
     public function disableTheftProtectionLock($domainName)
     {
         try {
-            $data     = ['domainName' => $domainName, 'lockStatus' => false];
-            $response = $this->request('POST', 'domains/lock', $data);
+            // POST domains/unlock — NOT domains/lock with lockStatus=false. That
+            // field is not in the schema, so the gateway ignored it and the call
+            // simply locked the domain again: the customer could never turn the
+            // registrar lock off, and every attempt reinforced it.
+            $this->request('POST', 'domains/unlock', ['domainName' => $domainName]);
             return [
                 'result' => self::$RESULT_OK,
                 'data'   => [
