@@ -997,6 +997,37 @@ function domainnameapi_SaveDNS($params)
     return $values;
 }
 
+/**
+ * Normalise what CheckAvailability() handed back, or fail loudly.
+ *
+ * The call answers with either a list of rows or an error envelope
+ * (['result' => 'ERROR', 'error' => [...]]). Both are arrays, so iterating the
+ * response blindly walks the envelope and reads offsets off the string
+ * 'ERROR' — on PHP 8 an uncaught TypeError that kills the domain-checker
+ * response and leaves the customer on a spinner that never resolves. Errors
+ * are routine here: the REST gateway caps a bulk search at 20 domains, and the
+ * checker sends one entry per TLD (times each suggested label). Throwing lets
+ * WHMCS report the reason instead. (BUG-10773)
+ *
+ * @param mixed $result
+ * @return array rows, when the lookup succeeded
+ * @throws Exception carrying the API's own message, when it did not
+ */
+function domainnameapi_availability_rows($result) {
+    if (is_array($result) && !isset($result['result'])) {
+        return $result;
+    }
+
+    $error   = (is_array($result) && isset($result['error']) && is_array($result['error'])) ? $result['error'] : [];
+    $message = trim((string) ($error['Message'] ?? ''));
+    $details = trim((string) ($error['Details'] ?? ''));
+    if ($details !== '' && $details !== $message) {
+        $message = trim($message . ' - ' . $details, ' -');
+    }
+
+    throw new Exception($message !== '' ? $message : 'Domain availability lookup failed.');
+}
+
 function domainnameapi_CheckAvailability($params) {
     $dna = getDNAApi($params);
 
@@ -1020,7 +1051,7 @@ function domainnameapi_CheckAvailability($params) {
 
 
     //$tld=str_replace(".","",$domain['tld']);
-    $result = $dna->CheckAvailability([$label],$all_tlds,"1","create");
+    $result = domainnameapi_availability_rows($dna->CheckAvailability([$label],$all_tlds,"1","create"));
 
     $exchange_rates = domainnameapi_exchangerates();
 
@@ -1129,7 +1160,7 @@ function domainnameapi_GetDomainSuggestions($params) {
         }
     }
 
-    $result = $dna->CheckAvailability($labels,$all_tlds,"1","create");
+    $result = domainnameapi_availability_rows($dna->CheckAvailability($labels,$all_tlds,"1","create"));
 
     $exchange_rates = domainnameapi_exchangerates();
 
