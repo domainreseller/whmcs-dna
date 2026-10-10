@@ -45,56 +45,60 @@ function domainnameapi_getConfigArray($params) {
         $sysMsg =$addionalMessage='';
 
         if(strlen($params['API_UserName'])<1 ||  strlen($params['API_Password'])<1) {
-            $sysMsg = 'Please enter your username and password';
+            $sysMsg = 'Please enter your Reseller ID and API Key';
         }else{
+            try {
+                $dna = getDNAApi($params);
+                $username = $params["API_UserName"];
+                $password = $params["API_Password"];
+                $testmode = $params["API_TestMode"];
 
-            $dna = getDNAApi($params);
-            $username = $params["API_UserName"];
-            $password = $params["API_Password"];
-            $testmode = $params["API_TestMode"];
 
+                $addionalMessage = "Don't have a Domain Name API account yet? Get one here: <a href='https://www.domainnameapi.com/become-a-reseller' target='_blank'>https://www.domainnameapi.com/become-a-reseller</a>";
+                $sysMsg = domainnameapi_parse_cache('user_'.$username.md5($password).$testmode, 100, function () use ($dna) {
 
-            $addionalMessage = "Don't have a Domain Name API account yet? Get one here: <a href='https://www.domainnameapi.com/become-a-reseller' target='_blank'>https://www.domainnameapi.com/become-a-reseller</a>";
-            $sysMsg = domainnameapi_parse_cache('user_'.$username.md5($password).$testmode, 100, function () use ($dna) {
+                    $details = $dna->GetResellerDetails();
 
-                $details = $dna->GetResellerDetails();
+                    $sysMsg='';
 
-                $sysMsg='';
+                    if ($details['result'] != 'OK') {
+                         $sysMsg = "<b>Username and password combination not correct</b>";
 
-                if ($details['result'] != 'OK') {
-                     $sysMsg = "<b>Username and password combination not correct</b>";
-
-                     if (!empty($details['error'])) {
-                         $err        = $details['error'];
-                         $errParts   = [];
-                         if (!empty($err['Code']))    { $errParts[] = "Code: <b>{$err['Code']}</b>"; }
-                         if (!empty($err['Message'])) { $errParts[] = "Message: <b>{$err['Message']}</b>"; }
-                         if (!empty($err['Details']) && $err['Details'] !== ($err['Message'] ?? '')) {
-                             $errParts[] = "Details: {$err['Details']}";
+                         if (!empty($details['error'])) {
+                             $err        = $details['error'];
+                             $errParts   = [];
+                             if (!empty($err['Code']))    { $errParts[] = "Code: <b>{$err['Code']}</b>"; }
+                             if (!empty($err['Message'])) { $errParts[] = "Message: <b>{$err['Message']}</b>"; }
+                             if (!empty($err['Details']) && $err['Details'] !== ($err['Message'] ?? '')) {
+                                 $errParts[] = "Details: {$err['Details']}";
+                             }
+                             if ($errParts) {
+                                 $sysMsg .= "<br><span style='color:#c0392b'>" . implode(' | ', $errParts) . "</span>";
+                             }
                          }
-                         if ($errParts) {
-                             $sysMsg .= "<br><span style='color:#c0392b'>" . implode(' | ', $errParts) . "</span>";
+
+                         $sysMsg .= " | V.".domainnameapi_version();
+
+                         // Don't cache credential/API errors so the next save retries.
+                         return ['__dna_nocache' => $sysMsg];
+                    } else {
+                        $balances = [];
+                         $sysMsg = "User: <b>{$details['name']}({$details['id']})</b> , Balance: ";
+                        foreach ($details['balances'] as $k => $v) {
+                            $balances[]= "<b>{$v['balance']}{$v['symbol']}</b>";
                          }
-                     }
+                        $sysMsg .= implode(' | ', $balances);
 
-                     $sysMsg .= " | V.".domainnameapi_version();
+                        $sysMsg.= " | V.".domainnameapi_version();
+                        $addionalMessage='';
 
-                     // Don't cache credential/API errors so the next save retries.
-                     return ['__dna_nocache' => $sysMsg];
-                } else {
-                    $balances = [];
-                     $sysMsg = "User: <b>{$details['name']}({$details['id']})</b> , Balance: ";
-                    foreach ($details['balances'] as $k => $v) {
-                        $balances[]= "<b>{$v['balance']}{$v['symbol']}</b>";
-                     }
-                    $sysMsg .= implode(' | ', $balances);
-
-                    $sysMsg.= " | V.".domainnameapi_version();
-                    $addionalMessage='';
-
-                }
-                return $sysMsg;
-            });
+                    }
+                    return $sysMsg;
+                });
+            } catch (\Exception $e) {
+                $sysMsg = "<span style='color:#c0392b'><b>API Connection Error:</b> " . $e->getMessage() . "<br>Please ensure you are using your Reseller ID (UUID format) and API Key. The legacy SOAP API is no longer available.</span>";
+                $addionalMessage = "";
+            }
 
             if(strpos($sysMsg,'User' ) !== false){
                 $addionalMessage='';
@@ -116,16 +120,18 @@ function domainnameapi_getConfigArray($params) {
                 "Value" =>  "{$sysMsg}<br>{$addionalMessage}",
             ],
             "API_UserName" => [
-                "FriendlyName" => "UserName",
+                "FriendlyName" => "Reseller ID",
                 "Type"         => "text",
-                "Size"         => "20",
-                "Default"      => "ownername"
+                "Size"         => "40",
+                "Default"      => "",
+                "Description"  => "Enter your Reseller ID (UUID format)"
             ],
             "API_Password" => [
-                "FriendlyName" => "Password",
+                "FriendlyName" => "API Key",
                 "Type"         => "password",
-                "Size"         => "20",
-                "Default"      => "ownerpass"
+                "Size"         => "60",
+                "Default"      => "",
+                "Description"  => "Enter your API Key"
             ],
             "API_TestMode" => [
                 "FriendlyName" => "Test Mode",
