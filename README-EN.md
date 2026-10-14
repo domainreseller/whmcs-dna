@@ -22,7 +22,6 @@
 
 - WHMCS 7.8 or higher 
 - PHP7.4 or higher (Recommended 8.1) 
-- PHP SOAPClient plugin must be active. 
 - Customer T.C. Customfields containing identity information / Tax Number / Tax Office information. (Optional)
 
 ## Setup 
@@ -49,24 +48,17 @@ Put the "modules" folder in the folder you downloaded into the folder where Whmc
 <a href="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"><img width="400"  alt="image" src="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"></a>
 
 - On the page you entered, if you left the module files in the correct folder, "DomainNameAPI" will appear.
-- After activating, enter the username and password obtained by us.
-- After saving, your username and current balance will be visible.
+- After activating, enter the Reseller ID and API Key obtained by us.
+- After saving, your reseller name and current balance will be visible.
 - Match the TR Identity Number and Tax Number Information to be used to obtain the .tr domain name of your users, if any, from the settings you have seen.
 - If you are using single-primary currency except USD You may set "Exchange Convertion For TLD Sync" setting. (This setting is using for only pricing sync for regional TLD imports. Otherwise you do not need to change)
 
-## 🔑 API Credentials — Username/Password or Reseller ID/API Key?
+## 🔑 API Credentials — Reseller ID & API Key
 
-Both are supported — enter them into the same two module fields; the module detects which API to use automatically:
-
-| You have | "Username" field | "Password" field | API used |
-|---|---|---|---|
-| **New panel credentials** (recommended) | Reseller ID — UUID like `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | API Key | REST |
-| **Legacy credentials** | API username | API password | SOAP |
+Enter your Reseller ID (a UUID like `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) into the **Reseller ID** field and your API Key into the **API Key** field of the module settings.
 
 > 💡 Find your **Reseller ID** and **API Key** in your DomainNameAPI panel under **API Settings**.
-> ⚠️ These are **API credentials** — your panel login e-mail and password will **not** work here.
-
-No extra configuration is needed — if the username field contains a UUID the module uses the modern REST API, otherwise classic SOAP.
+> ⚠️ These are **API credentials** — your panel login details will **not** work here.
 
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Youtube link </a>

@@ -22,7 +22,6 @@
 
 - WHMCS 7.8 of hoger
 - PHP7.4 of hoger (Aanbevolen 8.1)
-- PHP SOAPClient-plug-in moet actief zijn.
 - Klant T.C. Aangepaste velden met identiteitsinformatie / BTW-nummer / Belastingkantoorinformatie. (Optioneel)
 
 ## Installatie
@@ -49,24 +48,17 @@ Plaats de map "modules" in de map die u hebt gedownload in de map waar Whmcs is 
 <a href="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"><img width="400"  alt="afbeelding" src="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"></a>
 
 - Op de pagina die u hebt ingevoerd, als u de modulebestanden in de juiste map hebt achtergelaten, verschijnt "DomainNameAPI".
-- Nadat u deze heeft geactiveerd, voert u de gebruikersnaam en het wachtwoord in die u van ons heeft ontvangen.
-- Nadat u heeft opgeslagen, is uw gebruikersnaam en huidige saldo zichtbaar.
+- Nadat u deze heeft geactiveerd, voert u de Reseller ID en de API-sleutel (API Key) in die u van ons heeft ontvangen.
+- Nadat u heeft opgeslagen, is uw resellernaam en huidige saldo zichtbaar.
 - Stem het TR-identiteitsnummer en de btw-nummerinformatie af die wordt gebruikt om de .tr-domeinnaam van uw gebruikers te verkrijgen, indien aanwezig, op de instellingen die u hebt gezien.
 - Als u een enkele primaire valuta gebruikt behalve USD, kunt u de instelling "Exchange Convertion For TLD Sync" instellen. (Deze instelling wordt alleen gebruikt voor prijssynchronisatie voor regionale TLD-imports. Anders hoeft u niets te wijzigen)
 
-## 🔑 API-inloggegevens — Gebruikersnaam/Wachtwoord of Reseller ID/API Key?
+## 🔑 API-inloggegevens — Reseller ID en API Key
 
-Beide worden ondersteund — voer ze in dezelfde twee modulevelden in; de module detecteert automatisch welke API wordt gebruikt:
-
-| U heeft | Veld "Gebruikersnaam" | Veld "Wachtwoord" | Gebruikte API |
-|---|---|---|---|
-| **Nieuwe panel-inloggegevens** (aanbevolen) | Reseller ID — UUID zoals `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | API Key | REST |
-| **Oude (legacy) inloggegevens** | API-gebruikersnaam | API-wachtwoord | SOAP |
+Voer uw Reseller ID (een UUID zoals `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) in het veld **Reseller ID** in en uw API Key in het veld **API Key** van de module-instellingen.
 
 > 💡 U vindt uw **Reseller ID** en **API Key** in uw DomainNameAPI-paneel onder **API-instellingen**.
-> ⚠️ Dit zijn **API-inloggegevens** — het e-mailadres en wachtwoord waarmee u in het paneel inlogt, werken hier **niet**.
-
-Er is geen extra configuratie nodig — als het gebruikersnaamveld een UUID bevat, gebruikt de module de moderne REST-API, anders klassiek SOAP.
+> ⚠️ Dit zijn **API-inloggegevens** — de gegevens waarmee u in het paneel inlogt, werken hier **niet**.
 
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Youtube-link </a>

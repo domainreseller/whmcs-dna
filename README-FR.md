@@ -22,7 +22,6 @@
 
 - WHMCS 7.8 ou version ultérieure
 - PHP7.4 ou version ultérieure (Recommandé 8.1)
-- Le plugin PHP SOAPClient doit être actif.
 - Champs personnalisés du client contenant des informations d'identité / Numéro de taxe / Informations sur le bureau des impôts. (Facultatif)
 
 ## Configuration
@@ -48,24 +47,17 @@ Placez le dossier "modules" dans le dossier que vous avez téléchargé à l'emp
 <a href="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"><img width="400" alt="image" src="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"></a>
 
 - Sur la page où vous êtes entré, si vous avez laissé les fichiers du module dans le dossier correct, "DomainNameAPI" apparaîtra.
-- Après l'activation, saisissez le nom d'utilisateur et le mot de passe obtenus auprès de nous.
-- Après l'enregistrement, votre nom d'utilisateur et votre solde actuel seront visibles.
+- Après l'activation, saisissez le Reseller ID et la clé API (API Key) obtenus auprès de nous.
+- Après l'enregistrement, votre nom de revendeur et votre solde actuel seront visibles.
 - Faites correspondre le numéro d'identification TR et les informations sur le numéro de taxe à utiliser pour obtenir le nom de domaine .tr de vos utilisateurs, le cas échéant, à partir des paramètres que vous avez vus.
 - Si vous utilisez une seule devise principale autre que l'USD, vous pouvez définir le paramètre "Exchange Convertion For TLD Sync". (Ce paramètre est utilisé uniquement pour la synchronisation des prix pour les importations de TLD régionaux. Sinon, vous n'avez pas besoin de le modifier)
 
-## 🔑 Identifiants API — Nom d'utilisateur/Mot de passe ou Reseller ID/API Key ?
+## 🔑 Identifiants API — Reseller ID et API Key
 
-Les deux sont pris en charge — saisissez-les dans les deux mêmes champs du module ; le module détecte automatiquement l'API à utiliser :
-
-| Vous disposez de | Champ « Nom d'utilisateur » | Champ « Mot de passe » | API utilisée |
-|---|---|---|---|
-| **Nouveaux identifiants du panneau** (recommandé) | Reseller ID — UUID au format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | API Key | REST |
-| **Anciens identifiants (legacy)** | Nom d'utilisateur API | Mot de passe API | SOAP |
+Saisissez votre Reseller ID (un UUID au format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) dans le champ **Reseller ID** et votre API Key dans le champ **API Key** des paramètres du module.
 
 > 💡 Vous trouverez votre **Reseller ID** et votre **API Key** dans votre panneau DomainNameAPI, section **Paramètres API**.
-> ⚠️ Ce sont des **identifiants API** — l'e-mail et le mot de passe de connexion à votre panneau ne fonctionneront **pas** ici.
-
-Aucune configuration supplémentaire n'est nécessaire — si le champ nom d'utilisateur contient un UUID, le module utilise l'API REST moderne, sinon le SOAP classique.
+> ⚠️ Ce sont des **identifiants API** — vos identifiants de connexion au panneau ne fonctionneront **pas** ici.
 
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Lien Youtube</a>

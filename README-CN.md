@@ -22,7 +22,6 @@
 
 - WHMCS 7.8 或更高版本
 - PHP7.4 或更高版本（建议使用8.1）
-- 必须激活 PHP SOAPClient 插件
 - 包含身份信息/税号/税务局信息的客户 T.C. 自定义字段（可选）
 
 ## 设置
@@ -48,24 +47,17 @@ _**如果你是在升级，请在安装之前备份旧文件。**_
 <a href="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"><img width="400"  alt="image" src="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"></a>
 
 - 在你进入的页面上，如果你将模块文件放在了正确的文件夹中，将会显示 "DomainNameAPI"。
-- 激活后，输入我们提供的用户名和密码。
-- 保存后，你的用户名和当前余额将可见。
+- 激活后，输入我们提供的经销商 ID（Reseller ID）和 API 密钥（API Key）。
+- 保存后，你的经销商名称和当前余额将可见。
 - 从你看到的设置中匹配用于获取用户的 TR 身份证号码和税号信息，如果有的话。
 - 如果你使用的是除美元以外的单一主要货币，你可以设置 "Exchange Convertion For TLD Sync" 设置。（此设置仅用于地区 TLD 导入的定价同步。否则，你不需要更改）
 
-## 🔑 API 凭据 — 用户名/密码还是 Reseller ID/API Key？
+## 🔑 API 凭据 — Reseller ID 与 API Key
 
-两种方式均受支持 — 将凭据填入相同的两个模块字段即可；模块会自动检测应使用哪种 API：
-
-| 你拥有的凭据 | "用户名" 字段 | "密码" 字段 | 使用的 API |
-|---|---|---|---|
-| **新版面板凭据**（推荐） | Reseller ID — 形如 `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` 的 UUID | API Key | REST |
-| **旧版凭据** | API 用户名 | API 密码 | SOAP |
+在模块设置的 **Reseller ID** 字段中填写形如 `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` 的 Reseller ID，在 **API Key** 字段中填写你的 API Key。
 
 > 💡 你可以在 DomainNameAPI 面板的 **API 设置** 中找到你的 **Reseller ID** 和 **API Key**。
-> ⚠️ 这些是 **API 凭据** — 你登录面板所用的电子邮箱和密码在此**无法使用**。
-
-无需额外配置 — 如果用户名字段中填写的是 UUID，模块将使用现代 REST API，否则使用经典 SOAP。
+> ⚠️ 这些是 **API 凭据** — 你登录面板所用的账户信息在此**无法使用**。
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Youtube 链接</a>
 

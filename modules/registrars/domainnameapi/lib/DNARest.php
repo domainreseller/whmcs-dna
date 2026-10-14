@@ -30,19 +30,6 @@ class DNARest
     private string $errorReportingPath = '';
 
     /**
-     * Api Username
-     *
-     * @var string $serviceUsername
-     */
-    private string $serviceUsername = "ownername";
-
-    /*
-     * Api Password
-     * @var string $servicePassword
-     */
-    private string $servicePassword = "ownerpass";
-
-    /**
      * Api Service REST URL
      * @var string $serviceUrl
      */
@@ -54,7 +41,7 @@ class DNARest
      *
      * The domain listing endpoint returns the numeric enum in `status` and the
      * textual label in `statusCode`; some responses may still deliver the
-     * numeric value only. This map lets us recover the SOAP-style label that
+     * numeric value only. This map lets us recover the textual label that
      * callers compare against (e.g. "Active"). Source: gateway DomainStatus enum.
      */
     private const DOMAIN_STATUS_MAP = [
@@ -250,7 +237,7 @@ class DNARest
 
 
     /**
-     * Format HTTP error codes to match SOAP error format: API_{code}_ERROR
+     * Format HTTP error codes as API_{code}_ERROR (the shape modules match on)
      */
     private function formatErrorCode($code): string
     {
@@ -478,8 +465,7 @@ class DNARest
                 // error.validationErrors[] as { members: ["$.path.field"], message }.
                 // Surface them to the end user instead of the generic "Validation
                 // failed. Please check the provided information." Otherwise the
-                // reseller never learns WHICH field is wrong. REST-only — the SOAP
-                // gateway does not return this shape.
+                // reseller never learns WHICH field is wrong.
                 $validationErrors = $parsedResponse['error']['validationErrors']
                     ?? ($parsedResponse['validationErrors'] ?? null);
                 if (is_array($validationErrors) && !empty($validationErrors)) {
@@ -532,7 +518,7 @@ class DNARest
         try {
             $response = $this->request('GET', 'deposit/accounts/me');
 
-            // Use the same pattern as SOAP
+            // Same result envelope the modules expect
             $resp = [];
 
             if (isset($response['resellerId'])) {
@@ -585,7 +571,7 @@ class DNARest
     {
         $currencyName = strtoupper($currencyId);
 
-        // SOAP parity: TRY -> TL, map currency IDs
+        // Legacy contract: TRY -> TL, map currency IDs
         $currencyMap = [
             'USD' => ['id' => 2, 'name' => 'USD', 'symbol' => '$'],
             'TRY' => ['id' => 1, 'name' => 'TL',  'symbol' => 'TL'],
@@ -695,7 +681,7 @@ class DNARest
     public function getList($extra_parameters = [])
     {
         try {
-            // Callers built for the SOAP gateway page with PageNumber (0-based)
+            // Callers page with PageNumber (0-based)
             // + PageSize and sort with OrderColumn/OrderDirection (dna-extended
             // does exactly this). The REST endpoint only knows SkipCount /
             // MaxResultCount / Sorting — translate here, otherwise the legacy
@@ -801,7 +787,7 @@ class DNARest
                                     foreach ($apiValue as $priceInfo) {
                                         if (is_array($priceInfo)) {
                                             $period = (int)($priceInfo['period'] ?? 1);
-                                            if ($period < 1) $period = 1; // SOAP parity: period 0 -> 1
+                                            if ($period < 1) $period = 1; // period 0 -> 1
                                             $price                      = isset($priceInfo['price']) ? number_format((float)$priceInfo['price'],
                                                 4, '.', '') : '0.0000';
                                             $pricing[$outType][$period] = $price;
@@ -811,7 +797,7 @@ class DNARest
                                 } elseif (is_array($apiValue)) {
                                     // If it's an object
                                     $period = (int)($apiValue['period'] ?? 1);
-                                    if ($period < 1) $period = 1; // SOAP parity: period 0 -> 1
+                                    if ($period < 1) $period = 1; // period 0 -> 1
                                     $price                      = isset($apiValue['price']) ? number_format((float)$apiValue['price'],
                                         4, '.', '') : '0.0000';
                                     $pricing[$outType][$period] = $price;
@@ -821,7 +807,7 @@ class DNARest
                         }
                     }
 
-                    // Sort pricing arrays by key (period) - SOAP uses 1-based ascending order
+                    // Sort pricing arrays by key (period) - 1-based ascending order
                     foreach ($pricing as $type => $periods) {
                         ksort($pricing[$type], SORT_NUMERIC);
                     }
@@ -1898,7 +1884,7 @@ class DNARest
             // Domain info already includes the contacts
             $domainInfo = $this->request('GET', 'domains/info', ['DomainName' => $domainName]);
 
-            // REST API contactType → SOAP key mapping
+            // REST API contactType → module contact key mapping
             $typeMap = [
                 'Admin'      => 'Administrative',
                 'Billing'    => 'Billing',
@@ -1910,12 +1896,12 @@ class DNARest
             if (isset($domainInfo['contacts']) && is_array($domainInfo['contacts'])) {
                 foreach ($domainInfo['contacts'] as $contactItem) {
                     $apiType = $contactItem['contactType'] ?? '';
-                    $soapKey = $typeMap[$apiType] ?? ucfirst(strtolower($apiType));
-                    $contacts[$soapKey] = $this->parseContactInfo(array_merge($contactItem, ['type' => $soapKey]));
+                    $contactKey = $typeMap[$apiType] ?? ucfirst(strtolower($apiType));
+                    $contacts[$contactKey] = $this->parseContactInfo(array_merge($contactItem, ['type' => $contactKey]));
                 }
             }
 
-            // SOAP key order: Administrative, Billing, Registrant, Technical
+            // Contact key order: Administrative, Billing, Registrant, Technical
             $orderedContacts = [];
             foreach (['Administrative', 'Billing', 'Registrant', 'Technical'] as $key) {
                 if (isset($contacts[$key])) {
@@ -2149,8 +2135,7 @@ class DNARest
 
             // Normalize + strip empty entries first, THEN fall back to
             // defaults — a list like ["", ""] is non-empty but yields zero
-            // valid NS, which the gateway rejects with API_560. (Parity with
-            // DNASoap::register.)
+            // valid NS, which the gateway rejects with API_560.
             $nameServers = $this->normalizeHostNameList($nameServers);
             if (empty($nameServers)) {
                 $nameServers = self::$DEFAULT_NAMESERVERS;
@@ -2159,10 +2144,10 @@ class DNARest
             // For .tr domains the REST gateway only accepts the canonical TRABIS
             // schema (TRABISDOMAINCATEGORY=Owner|Corporate + TRABISCITIZENID /
             // TRABISTAXOFFICE / TRABISTAXNUMBER). Downstream modules still build the
-            // legacy SOAP-era shape (numeric or Company/Personal category, the
+            // legacy shape (numeric or Company/Personal category, the
             // TRABISCITIZIENID typo, and TRABISCOUNTRY*/CITY*/NAMESURNAME/ORG
             // fields), which the gateway rejects with "Validation failed". Normalize
-            // here — REST ONLY; the SOAP gateway still accepts the legacy names.
+            // here.
             if (substr(strtolower((string) $domainName), -3) === '.tr') {
                 $additionalAttributes = $this->normalizeTrAttributes((array) $additionalAttributes);
             }
@@ -2346,8 +2331,7 @@ class DNARest
     /**
      * Normalize legacy .tr TRABIS attributes to the REST gateway schema.
      *
-     * REST-ONLY. The SOAP gateway still accepts the legacy/typo'd field names,
-     * so this must NOT be reused for DNASoap. Supported REST keys are exactly:
+     * Supported REST keys are exactly:
      * TRABISDOMAINCATEGORY, TRABISCITIZENID, TRABISTAXOFFICE, TRABISTAXNUMBER.
      *
      * @param array $attrs
@@ -2359,7 +2343,7 @@ class DNARest
             return is_array($attrs) ? $attrs : [];
         }
 
-        // Direct key→key map: legacy/SOAP-era name => REST /tlds schema name.
+        // Direct key→key map: legacy name => REST /tlds schema name.
         // Any key NOT listed here (TRABISNAMESURNAME, TRABISCOUNTRYID, TRABISCITYID,
         // TRABISCOUNTRYNAME, TRABISCITYNAME, TRABISORGANIZATION, ...) is dropped — it
         // is legacy data the gateway now derives from the contact record, and sending
@@ -2458,9 +2442,9 @@ class DNARest
         $typeMap = ['Billing' => 'Billing', 'Tech' => 'Technical', 'Admin' => 'Administrative', 'Registrant' => 'Registrant'];
         foreach ($contacts as $c) {
             $apiType = $c['ContactType'] ?? ($c['contactType'] ?? '');
-            $soapKey = $typeMap[$apiType] ?? null;
-            if ($soapKey) {
-                $result[$soapKey]['ID'] = $c['handle'] ?? ($c['id'] ?? 0);
+            $contactKey = $typeMap[$apiType] ?? null;
+            if ($contactKey) {
+                $result[$contactKey]['ID'] = $c['handle'] ?? ($c['id'] ?? 0);
             }
         }
         return $result;
@@ -2472,7 +2456,7 @@ class DNARest
      * Accepts either the numeric DomainStatus enum (e.g. 0) or a label string
      * (e.g. "Active"). Numeric values are resolved via DOMAIN_STATUS_MAP;
      * unknown numerics fall through as their string form, and label strings
-     * are returned untouched. This keeps SOAP/REST parity for callers that
+     * are returned untouched. This keeps the legacy contract for callers that
      * compare against "Active".
      *
      * @param mixed $value
@@ -2531,7 +2515,7 @@ class DNARest
                     $data['nameservers']) : [],
                 'Additional'              => isset($data['additionalAttributes']) ? (array)$data['additionalAttributes'] : [],
                 'ChildNameServers'        => isset($data['hosts']) ? array_map(function ($ns) {
-                    // SOAP parity: ip returned as a string (the last IP)
+                    // Legacy contract: ip returned as a string (the last IP)
                     $ips = array_map(function ($ip) {
                         return $ip['ipAddress'];
                     }, $ns['ipAddresses'] ?? []);
@@ -2595,7 +2579,7 @@ class DNARest
      */
     private function parseContact($contact, $type)
     {
-        // SOAP type → REST API type mapping
+        // Module contact type → REST API type mapping
         $typeMap = [
             'Administrative' => 'Admin',
             'Technical'      => 'Tech',
@@ -2660,7 +2644,6 @@ class DNARest
     /**
      * Split a free-form phone/fax number into (subscriber number, country code).
      *
-     * REST-ONLY — DNASoap keeps its own validateContact() logic untouched.
      * The gateway caps `phone` at 16 characters and expects the country code in
      * its own field, so anything the caller pasted in ("+90 5323743388",
      * "0532 374 33 88") has to be reduced to digits and stripped of the dial
@@ -2696,7 +2679,7 @@ class DNARest
 
         if ($cc === '') {
             // Recover a Turkish country code the caller left out; otherwise fall
-            // back to the library default, same as DNASoap::validateContact().
+            // back to the library default.
             if (strlen($digits) === 12 && strpos($digits, '90') === 0) {
                 $cc     = '90';
                 $digits = substr($digits, 2);
@@ -2725,7 +2708,7 @@ class DNARest
 
     /**
      * Check whether a domain can be transferred with the given auth code.
-     * Mirrors the SOAP contract: returns {result: OK|ERROR}; OK iff the
+     * Returns {result: OK|ERROR}; OK iff the
      * registry reports the domain is currently transferable. The richer
      * fields the REST gateway returns (authCodeIsValid, transferLock, etc.)
      * are surfaced under `data` for callers that want them.
@@ -2776,13 +2759,12 @@ class DNARest
     /**
      * Validate and normalize contact information.
      *
-     * Mirrors DNASoap::validateContact() — a contact that the reseller's panel
-     * left half-empty is completed with placeholders instead of failing the
-     * whole registration — and additionally covers what the REST gateway
-     * validates but the SOAP one did not:
+     * A contact that the reseller's panel left half-empty is completed with
+     * placeholders instead of failing the whole registration, and the
+     * gateway's own rules are applied up front:
      *
-     *  - `State` is required ("Registrant State is required."); SOAP never sent
-     *    a default, so it falls back to the city.
+     *  - `State` is required ("Registrant State is required."); it falls
+     *    back to the city.
      *  - First/last name "cannot contain numeric or special characters", so
      *    digits and punctuation are stripped before sending.
      *  - `Phone` is capped at 16 chars with the country code in its own field

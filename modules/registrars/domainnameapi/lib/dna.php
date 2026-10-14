@@ -9,18 +9,17 @@
 
 /**
  * Class DomainNameAPI_PHPLibrary
- * Facade that routes API calls to the appropriate implementation (REST or SOAP)
- * based on the username format:
- *   - UUID username → DNARest (REST API)
- *   - Normal username → DNASoap (SOAP API)
+ * Facade over the DomainNameAPI REST client (DNARest). Authenticates with
+ * a Reseller ID (UUID) and an API Key.
  *
  * @package DomainNameApi
- * @version 3.0.17
+ * @version 4.0.0
  */
 
 namespace DomainNameApi;
 
 require_once __DIR__ . '/SharedApiConfigAndUtilsTrait.php';
+require_once __DIR__ . '/DNARest.php';
 
 use Exception;
 
@@ -29,49 +28,26 @@ class DomainNameAPI_PHPLibrary
     use SharedApiConfigAndUtilsTrait;
 
     /**
-     * The underlying API client (DNARest or DNASoap)
-     * @var object|null
+     * The underlying API client
+     * @var DNARest|null
      */
-    private ?object $client = null;
+    private ?DNARest $client = null;
 
     /**
      * DomainNameAPI_PHPLibrary constructor.
      *
-     * @param string $userName API username for authentication (UUID for REST, regular for SOAP)
-     * @param string $password API password/token for authentication
-     * @param bool $testmode Enable test/OTE environment (SOAP only)
-     * @throws Exception When connection fails
+     * @param string $resellerId Reseller ID (UUID)
+     * @param string $apiKey API Key
+     * @param bool $testmode Use the test (OTE) environment
      */
-    public function __construct($userName = "ownername", $password = "ownerpass", $testmode = false)
+    public function __construct($resellerId = '', $apiKey = '', $testmode = false)
     {
         // Credentials are frequently copy-pasted into module config fields and
-        // arrive with stray leading/trailing whitespace. Trim before anything
-        // else: it fixes the auth value AND the looksLikeUuid() routing below,
-        // which would otherwise misroute a padded UUID to the SOAP client.
-        $userName = trim((string) $userName);
-        $password = trim((string) $password);
+        // arrive with stray leading/trailing whitespace.
+        $resellerId = trim((string) $resellerId);
+        $apiKey     = trim((string) $apiKey);
 
-        if ($this->looksLikeUuid($userName)) {
-            require_once __DIR__ . '/DNARest.php';
-            $this->client = new DNARest($userName, $password,$testmode);
-        } else {
-            require_once __DIR__ . '/DNASoap.php';
-            $this->client = new DNASoap($userName, $password, $testmode);
-        }
-    }
-
-    /**
-     * Check if a string looks like a UUID
-     *
-     * @param string $value Value to check
-     * @return bool True if value matches UUID format
-     */
-    private function looksLikeUuid(string $value): bool
-    {
-        return (bool) preg_match(
-            '/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/',
-            $value
-        );
+        $this->client = new DNARest($resellerId, $apiKey, $testmode);
     }
 
     /**
@@ -144,73 +120,61 @@ class DomainNameAPI_PHPLibrary
     // Explicit delegations for IDE autocompletion and documentation
 
     /**
-     * @see DNASoap::getResellerDetails()
      * @see DNARest::getResellerDetails()
      */
     public function getResellerDetails() { return $this->client->getResellerDetails(); }
 
     /**
-     * @see DNASoap::getCurrentBalance()
      * @see DNARest::getCurrentBalance()
      */
     public function getCurrentBalance($currencyId = 'USD') { return $this->client->getCurrentBalance($currencyId); }
 
     /**
-     * @see DNASoap::checkAvailability()
      * @see DNARest::checkAvailability()
      */
     public function checkAvailability($domains, $extensions, $period, $command) { return $this->client->checkAvailability($domains, $extensions, $period, $command); }
 
     /**
-     * @see DNASoap::getList()
      * @see DNARest::getList()
      */
     public function getList($extra_parameters = []) { return $this->client->getList($extra_parameters); }
 
     /**
-     * @see DNASoap::getTldList()
      * @see DNARest::getTldList()
      */
     public function getTldList($count = 20) { return $this->client->getTldList($count); }
 
     /**
-     * @see DNASoap::getDetails()
      * @see DNARest::getDetails()
      */
     public function getDetails($domainName) { return $this->client->getDetails($domainName); }
 
     /**
-     * @see DNASoap::modifyNameServer()
      * @see DNARest::modifyNameServer()
      */
     public function modifyNameServer($domainName, $nameServers) { return $this->client->modifyNameServer($domainName, $nameServers); }
 
     /**
-     * @see DNASoap::enableTheftProtectionLock()
      * @see DNARest::enableTheftProtectionLock()
      */
     public function enableTheftProtectionLock($domainName) { return $this->client->enableTheftProtectionLock($domainName); }
 
     /**
-     * @see DNASoap::disableTheftProtectionLock()
      * @see DNARest::disableTheftProtectionLock()
      */
     public function disableTheftProtectionLock($domainName) { return $this->client->disableTheftProtectionLock($domainName); }
 
     /**
-     * @see DNASoap::addChildNameServer()
      * @see DNARest::addChildNameServer()
      */
     public function addChildNameServer($domainName, $nameServer, $ipAddress) { return $this->client->addChildNameServer($domainName, $nameServer, $ipAddress); }
 
     /**
-     * @see DNASoap::deleteChildNameServer()
      * @see DNARest::deleteChildNameServer()
      */
     public function deleteChildNameServer($domainName, $nameServer) { return $this->client->deleteChildNameServer($domainName, $nameServer); }
 
     /**
-     * @see DNASoap::modifyChildNameServer()
      * @see DNARest::modifyChildNameServer()
      */
     public function modifyChildNameServer($domainName, $nameServer, $ipAddress) { return $this->client->modifyChildNameServer($domainName, $nameServer, $ipAddress); }
@@ -290,67 +254,56 @@ class DomainNameAPI_PHPLibrary
     public function deleteForwarding($domainName) { return $this->client->deleteForwarding($domainName); }
 
     /**
-     * @see DNASoap::getContacts()
      * @see DNARest::getContacts()
      */
     public function getContacts($domainName) { return $this->client->getContacts($domainName); }
 
     /**
-     * @see DNASoap::saveContacts()
      * @see DNARest::saveContacts()
      */
     public function saveContacts($domainName, $contacts) { return $this->client->saveContacts($domainName, $contacts); }
 
     /**
-     * @see DNASoap::transfer()
      * @see DNARest::transfer()
      */
     public function transfer($domainName, $eppCode, $period) { return $this->client->transfer($domainName, $eppCode, $period); }
 
     /**
-     * @see DNASoap::cancelTransfer()
      * @see DNARest::cancelTransfer()
      */
     public function cancelTransfer($domainName) { return $this->client->cancelTransfer($domainName); }
 
     /**
-     * @see DNASoap::approveTransfer()
      * @see DNARest::approveTransfer()
      */
     public function approveTransfer($domainName) { return $this->client->approveTransfer($domainName); }
 
     /**
-     * @see DNASoap::rejectTransfer()
      * @see DNARest::rejectTransfer()
      */
     public function rejectTransfer($domainName) { return $this->client->rejectTransfer($domainName); }
 
     /**
-     * @see DNASoap::renew()
      * @see DNARest::renew()
      */
     public function renew($domainName, $period) { return $this->client->renew($domainName, $period); }
 
     /**
-     * @see DNASoap::registerWithContactInfo()
      * @see DNARest::registerWithContactInfo()
      */
     public function registerWithContactInfo($domainName, $period, $contacts, $nameServers = [], $eppLock = true, $privacyLock = false, $addionalAttributes = []) { return $this->client->registerWithContactInfo($domainName, $period, $contacts, $nameServers, $eppLock, $privacyLock, $addionalAttributes); }
 
     /**
-     * @see DNASoap::modifyPrivacyProtectionStatus()
      * @see DNARest::modifyPrivacyProtectionStatus()
      */
     public function modifyPrivacyProtectionStatus($domainName, $status, $reason = 'Owner request') { return $this->client->modifyPrivacyProtectionStatus($domainName, $status, $reason); }
 
     /**
-     * @see DNASoap::syncFromRegistry()
      * @see DNARest::syncFromRegistry()
      */
     public function syncFromRegistry($domainName) { return $this->client->syncFromRegistry($domainName); }
 
     /**
-     * @see DNASoap::checkTransfer()
      * @see DNARest::checkTransfer()
      */
     public function checkTransfer($domainName, $authcode) { return $this->client->checkTransfer($domainName, $authcode); }

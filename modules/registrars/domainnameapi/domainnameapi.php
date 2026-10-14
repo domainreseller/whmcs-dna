@@ -40,161 +40,147 @@ function domainnameapi_getConfigArray($params) {
         return $customfields;
     });
 
-    if (class_exists("SoapClient")) {
+    $sysMsg =$addionalMessage='';
 
-        $sysMsg =$addionalMessage='';
+    if(strlen($params['API_UserName'])<1 ||  strlen($params['API_Password'])<1) {
+        $sysMsg = 'Please enter your Reseller ID and API Key';
+    }else{
 
-        if(strlen($params['API_UserName'])<1 ||  strlen($params['API_Password'])<1) {
-            $sysMsg = 'Please enter your username and password';
-        }else{
-
-            $dna = getDNAApi($params);
-            $username = $params["API_UserName"];
-            $password = $params["API_Password"];
-            $testmode = $params["API_TestMode"];
+        $dna = getDNAApi($params);
+        $resellerId = $params["API_UserName"];
+        $apiKey     = $params["API_Password"];
+        $testmode   = $params["API_TestMode"];
 
 
-            $addionalMessage = "Don't have a Domain Name API account yet? Get one here: <a href='https://www.domainnameapi.com/become-a-reseller' target='_blank'>https://www.domainnameapi.com/become-a-reseller</a>";
-            $sysMsg = domainnameapi_parse_cache('user_'.$username.md5($password).$testmode, 100, function () use ($dna) {
+        $addionalMessage = "Don't have a Domain Name API account yet? Get one here: <a href='https://www.domainnameapi.com/become-a-reseller' target='_blank'>https://www.domainnameapi.com/become-a-reseller</a>";
+        $sysMsg = domainnameapi_parse_cache('user_'.$resellerId.md5($apiKey).$testmode, 100, function () use ($dna) {
 
-                $details = $dna->GetResellerDetails();
+            $details = $dna->GetResellerDetails();
 
-                $sysMsg='';
+            $sysMsg='';
 
-                if ($details['result'] != 'OK') {
-                     $sysMsg = "<b>Username and password combination not correct</b>";
+            if ($details['result'] != 'OK') {
+                 $sysMsg = "<b>Reseller ID and API Key combination not correct</b>";
 
-                     if (!empty($details['error'])) {
-                         $err        = $details['error'];
-                         $errParts   = [];
-                         if (!empty($err['Code']))    { $errParts[] = "Code: <b>{$err['Code']}</b>"; }
-                         if (!empty($err['Message'])) { $errParts[] = "Message: <b>{$err['Message']}</b>"; }
-                         if (!empty($err['Details']) && $err['Details'] !== ($err['Message'] ?? '')) {
-                             $errParts[] = "Details: {$err['Details']}";
-                         }
-                         if ($errParts) {
-                             $sysMsg .= "<br><span style='color:#c0392b'>" . implode(' | ', $errParts) . "</span>";
-                         }
+                 if (!empty($details['error'])) {
+                     $err        = $details['error'];
+                     $errParts   = [];
+                     if (!empty($err['Code']))    { $errParts[] = "Code: <b>{$err['Code']}</b>"; }
+                     if (!empty($err['Message'])) { $errParts[] = "Message: <b>{$err['Message']}</b>"; }
+                     if (!empty($err['Details']) && $err['Details'] !== ($err['Message'] ?? '')) {
+                         $errParts[] = "Details: {$err['Details']}";
                      }
-
-                     $sysMsg .= " | V.".domainnameapi_version();
-
-                     // Don't cache credential/API errors so the next save retries.
-                     return ['__dna_nocache' => $sysMsg];
-                } else {
-                    $balances = [];
-                     $sysMsg = "User: <b>{$details['name']}({$details['id']})</b> , Balance: ";
-                    foreach ($details['balances'] as $k => $v) {
-                        $balances[]= "<b>{$v['balance']}{$v['symbol']}</b>";
+                     if ($errParts) {
+                         $sysMsg .= "<br><span style='color:#c0392b'>" . implode(' | ', $errParts) . "</span>";
                      }
-                    $sysMsg .= implode(' | ', $balances);
+                 }
 
-                    $sysMsg.= " | V.".domainnameapi_version();
-                    $addionalMessage='';
+                 $sysMsg .= " | V.".domainnameapi_version();
 
-                }
-                return $sysMsg;
-            });
+                 // Don't cache credential/API errors so the next save retries.
+                 return ['__dna_nocache' => $sysMsg];
+            } else {
+                $balances = [];
+                 $sysMsg = "User: <b>{$details['name']}({$details['id']})</b> , Balance: ";
+                foreach ($details['balances'] as $k => $v) {
+                    $balances[]= "<b>{$v['balance']}{$v['symbol']}</b>";
+                 }
+                $sysMsg .= implode(' | ', $balances);
 
-            if(strpos($sysMsg,'User' ) !== false){
+                $sysMsg.= " | V.".domainnameapi_version();
                 $addionalMessage='';
-            }
-            
-            if($testmode ===true || $testmode == 'on' || $testmode == 'yes') {
-                $addionalMessage = "-- You are using the test platform. --";
-            }
 
+            }
+            return $sysMsg;
+        });
+
+        if(strpos($sysMsg,'User' ) !== false){
+            $addionalMessage='';
+        }
+        
+        if($testmode ===true || $testmode == 'on' || $testmode == 'yes') {
+            $addionalMessage = "-- You are using the test platform. --";
         }
 
-        $configarray = [
-            "FriendlyName" => [
-                "Type"  => "System",
-                "Value" => "DomainNameAPI"
-            ],
-            "Description"  => [
-                "Type"  => "System",
-                "Value" =>  "{$sysMsg}<br>{$addionalMessage}",
-            ],
-            "API_UserName" => [
-                "FriendlyName" => "UserName",
-                "Type"         => "text",
-                "Size"         => "20",
-                "Default"      => "ownername"
-            ],
-            "API_Password" => [
-                "FriendlyName" => "Password",
-                "Type"         => "password",
-                "Size"         => "20",
-                "Default"      => "ownerpass"
-            ],
-            "API_TestMode" => [
-                "FriendlyName" => "Test Mode",
-                "Type"         => "yesno",
-                "Default"      => "yes",
-                "Description"  => "Check for using test platform!"
-            ],
-            'TrIdendity'   => [
-                'FriendlyName' => 'Turkish Identity Number',
-                'Type'         => 'dropdown',
-                'Options'      => $customfields,
-                'Description'  => 'Turkish Identity Number Custom Field, required only for .tr TLD',
-            ],
-            'TrTaxOffice'  => [
-                'FriendlyName' => 'Turkish Tax Office',
-                'Type'         => 'dropdown',
-                'Options'      => $customfields,
-                'Description'  => 'Turkish Tax Office Custom Field, required only for .tr TLD',
-            ],
-            'TrTaxNumber'  => [
-                'FriendlyName' => 'Turkish Tax Identification Number',
-                'Type'         => 'dropdown',
-                'Options'      => $customfields,
-                'Description'  => 'Turkish Tax Identification Number Custom Field, required only for .tr TLD',
-            ],
-            'basecurrency' => [
-                'FriendlyName' => 'Exchange Conversion for TLD Sync',
-                'Type'         => 'dropdown',
-                'Options'      => [
-                    'no'  => 'Do Not Convert',
-                    'TRY' => 'to TRY',
-                    'EUR' => 'to EUR',
-                    'IRR' => 'to IRR',
-                    'INR' => 'to INR',
-                    'PKR' => 'to PKR',
-                    'CNY' => 'to CNY',
-                    'AED' => 'to AED',
-                ],
-                'Description'  => 'Base Currency Conversion. <br><b>Strongly advice to not use this feature</b>. Using this feature means that you have read and fully understood the  <a href="https://github.com/domainreseller/whmcs-dna/blob/main/DISCLAIMER.md" target="_blank">DISCLAIMER AND WAIVER OF LIABILITY</a>'
-            ],
-            'AI_Suggestion' => [
-                'FriendlyName' => 'AI Domain Suggestions',
-                'Type'         => 'dropdown',
-                'Options'      => [
-                    'disabled' => 'Disabled',
-                    'country'  => 'Country Based',
-                    'language' => 'Language Based',
-                ],
-                'Description'  => 'Enable AI-powered domain suggestions using OpenAI. Country uses client country code, Language uses browser Accept-Language header.'
-            ],
-            'AI_OpenAI_Key' => [
-                'FriendlyName' => 'OpenAI API Key',
-                'Type'         => 'password',
-                'Size'         => '60',
-                'Description'  => 'Enter your OpenAI API key for AI-powered domain suggestions.'
-            ],
-        ];
-    } else {
-        return [
-            "FriendlyName" => [
-                "Type"  => "System",
-                "Value" => "Domain Name API - ICANN Accredited Domain Registrar from TURKEY"
-            ],
-            "Description"  => [
-                "Type"  => "System",
-                "Value" => "<span style='color:red'>Your server does not support SOAPClient. Please install and activate it. <a href='http://php.net/manual/en/class.soapclient.php' target='_blank'>Detailed informations</a></span>"
-            ],
-        ];
     }
+
+    $configarray = [
+        "FriendlyName" => [
+            "Type"  => "System",
+            "Value" => "DomainNameAPI"
+        ],
+        "Description"  => [
+            "Type"  => "System",
+            "Value" =>  "{$sysMsg}<br>{$addionalMessage}",
+        ],
+        "API_UserName" => [
+            "FriendlyName" => "Reseller ID",
+            "Type"         => "text",
+            "Size"         => "20",
+            "Default"      => ""
+        ],
+        "API_Password" => [
+            "FriendlyName" => "API Key",
+            "Type"         => "password",
+            "Size"         => "20",
+            "Default"      => ""
+        ],
+        "API_TestMode" => [
+            "FriendlyName" => "Test Mode",
+            "Type"         => "yesno",
+            "Default"      => "yes",
+            "Description"  => "Check for using test platform!"
+        ],
+        'TrIdendity'   => [
+            'FriendlyName' => 'Turkish Identity Number',
+            'Type'         => 'dropdown',
+            'Options'      => $customfields,
+            'Description'  => 'Turkish Identity Number Custom Field, required only for .tr TLD',
+        ],
+        'TrTaxOffice'  => [
+            'FriendlyName' => 'Turkish Tax Office',
+            'Type'         => 'dropdown',
+            'Options'      => $customfields,
+            'Description'  => 'Turkish Tax Office Custom Field, required only for .tr TLD',
+        ],
+        'TrTaxNumber'  => [
+            'FriendlyName' => 'Turkish Tax Identification Number',
+            'Type'         => 'dropdown',
+            'Options'      => $customfields,
+            'Description'  => 'Turkish Tax Identification Number Custom Field, required only for .tr TLD',
+        ],
+        'basecurrency' => [
+            'FriendlyName' => 'Exchange Conversion for TLD Sync',
+            'Type'         => 'dropdown',
+            'Options'      => [
+                'no'  => 'Do Not Convert',
+                'TRY' => 'to TRY',
+                'EUR' => 'to EUR',
+                'IRR' => 'to IRR',
+                'INR' => 'to INR',
+                'PKR' => 'to PKR',
+                'CNY' => 'to CNY',
+                'AED' => 'to AED',
+            ],
+            'Description'  => 'Base Currency Conversion. <br><b>Strongly advice to not use this feature</b>. Using this feature means that you have read and fully understood the  <a href="https://github.com/domainreseller/whmcs-dna/blob/main/DISCLAIMER.md" target="_blank">DISCLAIMER AND WAIVER OF LIABILITY</a>'
+        ],
+        'AI_Suggestion' => [
+            'FriendlyName' => 'AI Domain Suggestions',
+            'Type'         => 'dropdown',
+            'Options'      => [
+                'disabled' => 'Disabled',
+                'country'  => 'Country Based',
+                'language' => 'Language Based',
+            ],
+            'Description'  => 'Enable AI-powered domain suggestions using OpenAI. Country uses client country code, Language uses browser Accept-Language header.'
+        ],
+        'AI_OpenAI_Key' => [
+            'FriendlyName' => 'OpenAI API Key',
+            'Type'         => 'password',
+            'Size'         => '60',
+            'Description'  => 'Enter your OpenAI API key for AI-powered domain suggestions.'
+        ],
+    ];
 
     return $configarray;
 }
@@ -1221,8 +1207,7 @@ function domainnameapi_GetTldPricing($params) {
     $values = [];
 
     // REST gateway caps MaxResultCount at 1000 — anything higher returns
-    // 400 ModelState. SOAP doesn't have this cap but works fine with 1000
-    // too (total catalogue is ~850).
+    // 400 ModelState (total catalogue is ~850).
     $tldlist = $dna->GetTldList(1000);
 
     $convertable_currencies = domainnameapi_exchangerates();
@@ -1593,11 +1578,11 @@ function domainnameapi_ChildHosts($params)
 function getDNAApi($params){
     require_once __DIR__.'/lib/dna.php';
 
-    $username = $params["API_UserName"];
-    $password = $params["API_Password"];
-    $testmode = $params["API_TestMode"];
+    $resellerId = $params["API_UserName"];
+    $apiKey     = $params["API_Password"];
+    $testmode   = $params["API_TestMode"];
 
-    return new \DomainNameApi\DomainNameAPI_PHPLibrary($username,$password,$testmode);
+    return new \DomainNameApi\DomainNameAPI_PHPLibrary($resellerId,$apiKey,$testmode);
 }
 
 function domainnameapi_parse_contact($params) {
@@ -1710,7 +1695,7 @@ function domainnameapi_parse_trcontact($contactDetails) {
 
 function domainnameapi_parse_cache($key,$ttl,$callback){
 
-    //Long usernames can cause issues with the tblconfiguration table setting column
+    //Long cache keys can cause issues with the tblconfiguration table setting column
     $cache_key = "domainnameapi_".md5($key); //Exact 46 character
 
     $token_row = Capsule::table('tblconfiguration')

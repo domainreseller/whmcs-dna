@@ -23,7 +23,6 @@
 
 - WHMCS 7.8 və ya daha yüksək
 - PHP7.4 və ya daha yüksək (Tövsiyə olunan 8.1)
-- PHP SOAPClient plugini aktiv olmalıdır.
 - Müştəri T.C. şəxsiyyət məlumatı / Vergi nömrəsi / Vergi idarəsi məlumatı əks etdirən Xüsusi Sahələr. (İsteğe bağlı)
 
 ## Quraşdırma
@@ -50,24 +49,17 @@ Yüklədiyiniz qovluğa "modules" qovluğunu WHMCS-in quraşdırıldığı qovlu
 <a href="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"><img width="400"  alt="image" src="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"></a>
 
 - Daxil olduğunuz səhifədə əgər modul fayllarını doğru qovluqda qoymuşsanız, "DomainNameAPI" görünəcəkdir.
-- Aktivləşdirdikdən sonra, tərəfimizdən əldə edilmiş istifadəçi adını və şifrəni daxil edin.
-- Yaddaşa aldıqdan sonra, istifadəçi adınız və cari balansınız görünür olacaq.
+- Aktivləşdirdikdən sonra, tərəfimizdən əldə edilmiş Reseller ID və API Açarını (API Key) daxil edin.
+- Yaddaşa aldıqdan sonra, reseller adınız və cari balansınız görünür olacaq.
 - Köhnər müştərilərinizin .tr domen adını əldə etmək üçün istifadə ediləcək TR Şəxsiyyət Vəsiqəsi Nömrəsi və Vergi Nömrəsi Məlumatını quraşdırmış olduğunuz parametrlərlə uyğunlaşdırın.
 - Əgər USD-dan başqa bir əsas valyuta istifadə edirsinizsə, "TLD Sync üçün Exchange Konvertasiya" parametrini təyin edə bilərsiniz. (Bu parametr yalnız bölgəvi TLD girişləri üçün qiymət sinxronizasiyası üçün istifadə edilir. Başqa tənzimləməyə ehtiyacınız yoxdur)
 
-## 🔑 API Giriş Məlumatları — İstifadəçi adı/Şifrə, yoxsa Reseller ID/API Key?
+## 🔑 API Giriş Məlumatları — Reseller ID və API Key
 
-Hər ikisi dəstəklənir — məlumatları eyni iki modul sahəsinə daxil edin; modul hansı API-nin istifadə olunacağını avtomatik müəyyən edir:
-
-| Sizdə olan | "İstifadəçi adı" sahəsi | "Şifrə" sahəsi | İstifadə olunan API |
-|---|---|---|---|
-| **Yeni panel giriş məlumatları** (tövsiyə olunur) | Reseller ID — `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` formatında UUID | API Key | REST |
-| **Köhnə (legacy) giriş məlumatları** | API istifadəçi adı | API şifrəsi | SOAP |
+Modul parametrlərində **Reseller ID** sahəsinə `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` formatındakı Reseller ID-nizi, **API Key** sahəsinə isə API Key-inizi daxil edin.
 
 > 💡 **Reseller ID** və **API Key** məlumatlarınızı DomainNameAPI panelinizdə **API Parametrləri** bölməsində tapa bilərsiniz.
-> ⚠️ Bunlar **API giriş məlumatlarıdır** — panelə daxil olduğunuz e-poçt və şifrə burada **işləməyəcək**.
-
-Əlavə konfiqurasiya tələb olunmur — istifadəçi adı sahəsində UUID varsa, modul müasir REST API-dən, əks halda klassik SOAP-dan istifadə edir.
+> ⚠️ Bunlar **API giriş məlumatlarıdır** — panelə daxil olduğunuz məlumatlar burada **işləməyəcək**.
 
 
 <a href="https://youtu.be/LEw_iMnquSo">+ Youtube link </a>

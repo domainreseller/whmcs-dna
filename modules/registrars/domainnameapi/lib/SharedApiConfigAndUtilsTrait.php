@@ -9,7 +9,7 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '3.0.17'; // Must be identical in both classes; update here if changed
+    public static $VERSION = '4.0.0'; // Must be identical in both classes; update here if changed
 
     public static $PERFORMANCE_SAMPLE_RATE = 40; // 2.5% (25 out of 1000)
     public static $RESULT_OK      = 'OK';
@@ -56,7 +56,7 @@ trait SharedApiConfigAndUtilsTrait
         ],
         'CREDENTIALS'             => [
             'code'        => 'CREDENTIALS',
-            'message'     => 'Invalid username and password',
+            'message'     => 'Invalid reseller ID or API key',
             'description' => 'The provided API credentials are invalid'
         ],
         'DOMAIN_LIST'             => [
@@ -88,11 +88,6 @@ trait SharedApiConfigAndUtilsTrait
             'code'        => 'RESPONSE_CODE',
             'message'     => 'Invalid parameters passed to function! Operation result or Error code not received from server',
             'description' => 'The API response is missing required operation result or error code fields'
-        ],
-        'RESPONSE_SOAP'           => [
-            'code'        => 'RESPONSE_SOAP',
-            'message'     => 'Invalid parameters passed to function! Soap return is not a valid array!',
-            'description' => 'The SOAP response is not in a valid array format'
         ],
         'RESPONSE_REST'           => [
             'code'        => 'RESPONSE_REST',
@@ -373,7 +368,7 @@ trait SharedApiConfigAndUtilsTrait
             'exception' => [
                 'values' => [
                     [
-                        'type'       => str_replace(['DomainNameApi\\DNARest', 'DomainNameApi\\DNASoap', 'DomainNameApi\\DomainNameAPI_PHPLibrary'], [$this->application . ' Exception', $this->application . ' Exception', $this->application . ' Exception'], $culpritClass),
+                        'type'       => str_replace(['DomainNameApi\\DNARest', 'DomainNameApi\\DomainNameAPI_PHPLibrary'], [$this->application . ' Exception', $this->application . ' Exception'], $culpritClass),
                         'value'      => $classification['value'],
                         'stacktrace' => [
                             'frames' => [
@@ -383,9 +378,8 @@ trait SharedApiConfigAndUtilsTrait
                                     'function' => str_replace([
                                         dirname(__DIR__), // May need adjustment depending on final structure
                                         'DomainNameApi\\DNARest',
-                                        'DomainNameApi\\DNASoap',
                                         'DomainNameApi\\DomainNameAPI_PHPLibrary'
-                                    ], ['.', 'Lib', 'Lib', 'Lib'], $e->getTraceAsString()),
+                                    ], ['.', 'Lib', 'Lib'], $e->getTraceAsString()),
                                 ]
                             ]
                         ]
@@ -405,7 +399,6 @@ trait SharedApiConfigAndUtilsTrait
                 'runtime_version' => phpversion(),
                 'elapsed_time'    => number_format($elapsed_time, 4),
                 'application'     => $this->application ?? 'UNKNOWN',
-                'extension_soap'  => extension_loaded('soap') ? 'enabled' : 'disabled',
                 'ip_address'      => $external_ip,
                 'vhost_user'      => $vhostUser,
             ],
@@ -449,7 +442,7 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * JSON-encode a Sentry event payload defensively. request_data /
      * response_data / original_message can carry invalid UTF-8 (a real
-     * failure mode — e.g. a binary SOAP body), which makes a plain
+     * failure mode — e.g. a binary response body), which makes a plain
      * json_encode() return false and silently drop the whole event exactly
      * when an error occurred. Substitute bad bytes and tolerate partial
      * output so the event still ships.
@@ -484,7 +477,7 @@ trait SharedApiConfigAndUtilsTrait
 
     /**
      * Volatile data shared by both error events and transaction events:
-     * reseller (REST UUID / SOAP username), domain (from lastRequest),
+     * reseller (UUID), domain (from lastRequest),
      * operation (lastFunction), api_code (from exception message regex or
      * the exception's own numeric code). Lives as tags so Sentry filters
      * like "reseller=X" or "api_code=API_500" cut across both event types.
@@ -498,15 +491,11 @@ trait SharedApiConfigAndUtilsTrait
 
         if (property_exists($this, 'resellerId') && !empty($this->resellerId)) {
             $tags['reseller'] = (string) $this->resellerId;
-        } elseif (property_exists($this, 'serviceUsername') && !empty($this->serviceUsername)) {
-            $tags['reseller'] = (string) $this->serviceUsername;
         }
 
         $lr = (property_exists($this, 'lastRequest') && is_array($this->lastRequest))
             ? $this->lastRequest : [];
-        $domain = $lr['payload']['domainName']
-               ?? $lr['request']['DomainName']
-               ?? null;
+        $domain = $lr['payload']['domainName'] ?? null;
         if (!empty($domain) && is_string($domain)) {
             $tags['domain'] = $domain;
         }
@@ -515,8 +504,8 @@ trait SharedApiConfigAndUtilsTrait
             $tags['operation'] = (string) $this->lastFunction;
         }
 
-        // Transport: DNASoap has a $service (SoapClient), DNARest does not.
-        $tags['api_type'] = property_exists($this, 'service') ? 'SOAP' : 'REST';
+        // Kept as a constant so existing Sentry filters on api_type still match.
+        $tags['api_type'] = 'REST';
 
         if ($e !== null) {
             $msg = (string) $e->getMessage();
@@ -702,8 +691,7 @@ trait SharedApiConfigAndUtilsTrait
             $root_span_id    = bin2hex(random_bytes(8));
             $child_span_id   = bin2hex(random_bytes(8));
 
-            $isSoap = property_exists($this, 'service');
-            $op     = $isSoap ? 'soap.client' : 'http.client';
+            $op = 'http.client';
 
             // OTel-compatible trace status (replaces the legacy "error"
             // literal which Sentry's Performance widgets do not understand).
@@ -734,7 +722,7 @@ trait SharedApiConfigAndUtilsTrait
             // description ("METHOD https://host") and reads the status from
             // span.data — without these the dashboard shows "Unknown Domain"
             // and "(no value)" response codes.
-            $httpMethod = $isSoap ? 'POST' : 'GET';
+            $httpMethod = 'GET';
             if (property_exists($this, 'lastRequest') && is_array($this->lastRequest)
                 && !empty($this->lastRequest['method'])) {
                 $httpMethod = (string) $this->lastRequest['method'];
@@ -746,7 +734,7 @@ trait SharedApiConfigAndUtilsTrait
                 $callUrl  = (string) $this->lastRequest['url']; // REST: full URL recorded
                 $callHost = (string) (parse_url($callUrl, PHP_URL_HOST) ?: '');
             } elseif (property_exists($this, 'serviceUrl') && is_string($this->serviceUrl)) {
-                $callHost = (string) (parse_url($this->serviceUrl, PHP_URL_HOST) ?: ''); // SOAP: gateway host
+                $callHost = (string) (parse_url($this->serviceUrl, PHP_URL_HOST) ?: '');
             }
 
             $spanData = ['http.request.method' => $httpMethod];
@@ -814,7 +802,7 @@ trait SharedApiConfigAndUtilsTrait
                     'memory'   => ['value' => memory_get_peak_usage(true),    'unit' => 'byte'],
                 ],
                 // Stub child span: a single span covering the outgoing call
-                // so the Sentry waterfall shows the op type (http/soap.client)
+                // so the Sentry waterfall shows the op type (http.client)
                 // even before we instrument sub-call timing. When parseCall/
                 // request gain real internal timing this span will narrow
                 // to just the network portion.

@@ -22,7 +22,6 @@
 
 - WHMCS 7.8 oder höher
 - PHP7.4 oder höher (empfohlen: 8.1)
-- Aktiviertes PHP SOAPClient-Plugin
 - Kundenspezifische Felder für türkische T.C. mit Identitätsinformationen / Steuernummer / Steuerbüroinformationen (optional)
 
 ## Setup
@@ -48,24 +47,17 @@ Legen Sie den "modules"-Ordner in den Ordner, den Sie heruntergeladen haben, in 
 <a href="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"><img width="400" alt="image" src="https://user-images.githubusercontent.com/3975986/209726687-fbf56bd3-e78a-457c-a118-86f87b9db6f0.png"></a>
 
 - Wenn Sie die Moduldateien in den richtigen Ordner verschoben haben, wird "DomainNameAPI" auf der eingegebenen Seite angezeigt.
-- Nach der Aktivierung geben Sie den Benutzernamen und das von uns erhaltene Passwort ein.
-- Nach dem Speichern werden Ihr Benutzername und das aktuelle Guthaben angezeigt.
+- Nach der Aktivierung geben Sie die von uns erhaltene Reseller ID und den API-Schlüssel (API Key) ein.
+- Nach dem Speichern werden Ihr Reseller-Name und das aktuelle Guthaben angezeigt.
 - Stimmen Sie die in den Einstellungen angezeigten Informationen zur türkischen Identifikationsnummer und Steuernummer ab, um den .tr-Domänennamen Ihrer Benutzer zu erhalten, sofern vorhanden.
 - Wenn Sie außer USD eine Einheitswährung verwenden, können Sie die Einstellung "Exchange Convertion For TLD Sync" festlegen. (Diese Einstellung dient nur der Preissynchronisierung für regionale TLD-Imports. Andernfalls müssen Sie nichts ändern.)
 
-## 🔑 API-Zugangsdaten — Benutzername/Passwort oder Reseller ID/API Key?
+## 🔑 API-Zugangsdaten — Reseller ID und API Key
 
-Beides wird unterstützt — tragen Sie die Daten in dieselben zwei Modulfelder ein; das Modul erkennt automatisch, welche API verwendet wird:
-
-| Sie haben | Feld "Benutzername" | Feld "Passwort" | Verwendete API |
-|---|---|---|---|
-| **Neue Panel-Zugangsdaten** (empfohlen) | Reseller ID — UUID im Format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | API Key | REST |
-| **Alte (Legacy-)Zugangsdaten** | API-Benutzername | API-Passwort | SOAP |
+Tragen Sie Ihre Reseller ID (eine UUID im Format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) in das Feld **Reseller ID** und Ihren API Key in das Feld **API Key** der Moduleinstellungen ein.
 
 > 💡 Ihre **Reseller ID** und Ihren **API Key** finden Sie in Ihrem DomainNameAPI-Panel unter **API-Einstellungen**.
-> ⚠️ Dies sind **API-Zugangsdaten** — die E-Mail-Adresse und das Passwort Ihres Panel-Logins funktionieren hier **nicht**.
-
-Es ist keine zusätzliche Konfiguration erforderlich — enthält das Benutzernamensfeld eine UUID, verwendet das Modul die moderne REST-API, andernfalls klassisches SOAP.
+> ⚠️ Dies sind **API-Zugangsdaten** — Ihre Panel-Anmeldedaten funktionieren hier **nicht**.
 
 <a href="https://youtu.be/LEw_iMnquSo">+ YouTube-Link</a>
 
