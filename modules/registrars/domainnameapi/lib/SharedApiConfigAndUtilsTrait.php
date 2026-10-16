@@ -9,9 +9,9 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '4.0.0'; // Must be identical in both classes; update here if changed
+    public static $VERSION = '4.0.1'; // Must be identical in both classes; update here if changed
 
-    public static $PERFORMANCE_SAMPLE_RATE = 40; // 2.5% (25 out of 1000)
+    public static $PERFORMANCE_SAMPLE_RATE = 40; // 4% (40 out of 1000)
     public static $RESULT_OK      = 'OK';
     public static $RESULT_ERROR   = 'ERROR';
     public static $RESULT_SUCCESS = 'SUCCESS';
@@ -128,6 +128,7 @@ trait SharedApiConfigAndUtilsTrait
 
     public static $DEFAULT_CACHE_TTL = 512;
     public static $DEFAULT_TIMEOUT   = 30;
+    public static $DEFAULT_CONNECT_TIMEOUT = 10;
     public static $DEFAULT_REASON    = 'Owner request';
 
     private static $APPLICATIONS = [
@@ -363,25 +364,17 @@ trait SharedApiConfigAndUtilsTrait
             'platform'  => 'php',
             'culprit'   => $culpritClass . ' via ' . $knownPath,
             'message'   => [
-                'formatted' => $classification['value']
+                'formatted' => $this->telemetryRedact($classification['value'])
             ],
             'exception' => [
                 'values' => [
                     [
                         'type'       => str_replace(['DomainNameApi\\DNARest', 'DomainNameApi\\DomainNameAPI_PHPLibrary'], [$this->application . ' Exception', $this->application . ' Exception'], $culpritClass),
-                        'value'      => $classification['value'],
+                        'value'      => $this->telemetryRedact($classification['value']),
+                        // File, line and function names only. getTraceAsString()
+                        // carried call arguments (EPP codes among them).
                         'stacktrace' => [
-                            'frames' => [
-                                [
-                                    'filename' => $errFile,
-                                    'lineno'   => $e->getLine(),
-                                    'function' => str_replace([
-                                        dirname(__DIR__), // May need adjustment depending on final structure
-                                        'DomainNameApi\\DNARest',
-                                        'DomainNameApi\\DomainNameAPI_PHPLibrary'
-                                    ], ['.', 'Lib', 'Lib'], $e->getTraceAsString()),
-                                ]
-                            ]
+                            'frames' => $this->telemetryFrames($e, $errFile)
                         ]
                     ]
                 ]
@@ -392,7 +385,6 @@ trait SharedApiConfigAndUtilsTrait
             'tags'      => [
                 'handled'         => 'yes',
                 'level'           => 'error',
-                'url'             => $_SERVER['REQUEST_URI'] ?? 'NA',
                 'transaction'     => $_SERVER['REQUEST_METHOD'] ?? 'NA',
                 'trace_id'        => bin2hex(random_bytes(8)),
                 'runtime_name'    => 'PHP',
@@ -400,11 +392,12 @@ trait SharedApiConfigAndUtilsTrait
                 'elapsed_time'    => number_format($elapsed_time, 4),
                 'application'     => $this->application ?? 'UNKNOWN',
                 'ip_address'      => $external_ip,
-                'vhost_user'      => $vhostUser,
+                'vhost_user'      => $this->telemetryAccountId($vhostUser),
             ],
+            // Request/response summaries only: no bodies, EPP codes or contacts.
             'extra'     => [
-                'request_data'  => method_exists($this, 'getRequestData') ? $this->getRequestData() : [],
-                'response_data' => method_exists($this, 'getResponseData') ? $this->getResponseData() : [],
+                'request_data'  => $this->telemetryRequestSummary(),
+                'response_data' => $this->telemetryResponseSummary(),
                 'openssl_v'     => defined('OPENSSL_VERSION_TEXT') ? OPENSSL_VERSION_TEXT : 'NA',
                 'openssl_n'     => defined('OPENSSL_VERSION_NUMBER') ? OPENSSL_VERSION_NUMBER : 'NA',
             ]
@@ -419,7 +412,7 @@ trait SharedApiConfigAndUtilsTrait
         // tags so it's filterable; the raw backend message is preserved in
         // extra.original_message so no detail is lost.
         $errorData['tags']                      = array_merge($errorData['tags'], $classification['tags']);
-        $errorData['extra']['original_message'] = $e->getMessage();
+        $errorData['extra']['original_message'] = $this->telemetryRedact((string) $e->getMessage());
         $errorData['fingerprint']               = $classification['fingerprint'];
 
         $sentry_auth = [
@@ -437,6 +430,80 @@ trait SharedApiConfigAndUtilsTrait
             return; // unencodable even after sanitising — drop rather than POST empty
         }
         $this->fireAndForgetPost($api_url, $payload, $sentry_auth_header);
+    }
+
+    /**
+     * Telemetry identifies a hosting account by a one-way hash, never by its
+     * name, so installs can be counted without revealing the account.
+     */
+    private function telemetryAccountId(string $account): string
+    {
+        return $account === '' ? '' : substr(hash('sha256', 'dna-telemetry|' . $account), 0, 16);
+    }
+
+    /**
+     * Mask e-mail addresses and long digit runs (phone, ID and tax numbers)
+     * in text that may echo user input.
+     */
+    private function telemetryRedact(string $text): string
+    {
+        $text = preg_replace('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[email]', $text);
+        $text = preg_replace('/\+?\d[\d\s().\-]{6,}\d/', '[number]', (string) $text);
+
+        return (string) $text;
+    }
+
+    /**
+     * What was called: method and endpoint path, without query or body.
+     */
+    private function telemetryRequestSummary(): array
+    {
+        $lr = (property_exists($this, 'lastRequest') && is_array($this->lastRequest)) ? $this->lastRequest : [];
+
+        return [
+            'method'   => (string) ($lr['method'] ?? ''),
+            'endpoint' => (string) (parse_url((string) ($lr['url'] ?? ''), PHP_URL_PATH) ?: ''),
+        ];
+    }
+
+    /**
+     * How it ended: HTTP status and the API's error code and message.
+     */
+    private function telemetryResponseSummary(): array
+    {
+        $parsed  = (property_exists($this, 'lastParsedResponse') && is_array($this->lastParsedResponse)) ? $this->lastParsedResponse : [];
+        $headers = (property_exists($this, 'lastResponseHeaders') && is_array($this->lastResponseHeaders)) ? $this->lastResponseHeaders : [];
+
+        return [
+            'http_code' => (int) ($headers['http_code'] ?? 0),
+            'code'      => isset($parsed['Code']) && is_scalar($parsed['Code']) ? (string) $parsed['Code'] : '',
+            'message'   => isset($parsed['Message']) && is_scalar($parsed['Message']) ? $this->telemetryRedact((string) $parsed['Message']) : '',
+        ];
+    }
+
+    /**
+     * Stack frames without call arguments, oldest first as Sentry expects.
+     */
+    private function telemetryFrames(Exception $e, string $errFile): array
+    {
+        $base   = (property_exists($this, 'errorReportingPath') && !empty($this->errorReportingPath)) ? $this->errorReportingPath : '';
+        $strip  = function (string $file) use ($base): string {
+            if ($base !== '' && strpos($file, $base) !== false) {
+                return substr($file, strpos($file, $base) + strlen($base));
+            }
+            return basename($file);
+        };
+        $frames = [];
+        foreach (array_reverse($e->getTrace()) as $t) {
+            $frames[] = [
+                'filename' => $strip((string) ($t['file'] ?? '')),
+                'lineno'   => (int) ($t['line'] ?? 0),
+                'function' => (isset($t['class']) ? $t['class'] . '::' : '') . ($t['function'] ?? ''),
+            ];
+        }
+        $frames[] = ['filename' => $errFile, 'lineno' => $e->getLine(), 'function' => ''];
+
+        return $frames;
     }
 
     /**
@@ -742,7 +809,7 @@ trait SharedApiConfigAndUtilsTrait
                 $spanData['server.address'] = $callHost;
             }
             if ($callUrl !== '') {
-                $spanData['url.full'] = $callUrl;
+                $spanData['url.full'] = strtok($callUrl, '?');
             }
             if (isset($commonTags['status_code'])) {
                 $spanData['http.response.status_code'] = (int) $commonTags['status_code'];
@@ -795,7 +862,7 @@ trait SharedApiConfigAndUtilsTrait
                 'tags' => array_merge([
                     'application' => $this->application ?? 'UNKNOWN',
                     'ip_address'  => $this->getServerIp(),
-                    'vhost_user'  => $vhostUser,
+                    'vhost_user'  => $this->telemetryAccountId($vhostUser),
                 ], $commonTags),
                 'measurements' => [
                     'duration' => ['value' => floatval($metrics['duration']), 'unit' => 'millisecond'],

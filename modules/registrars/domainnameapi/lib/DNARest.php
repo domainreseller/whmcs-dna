@@ -21,6 +21,13 @@ class DNARest
      * Error reporting enabled
      */
     private bool $errorReportingEnabled = true;
+
+    /**
+     * Verify the gateway's TLS certificate. Leave on; switch off with
+     * setSslVerification(false) only on a host whose CA bundle is too old to
+     * validate the certificate.
+     */
+    private bool $sslVerify = true;
     /**
      * Error Reporting Will send this sentry endpoint, if errorReportingEnabled is true
      * This request does not include sensitive informations, sensitive informations are filtered.
@@ -104,6 +111,16 @@ class DNARest
         $this->token      = $token;
     }
 
+
+    /**
+     * Turn TLS certificate verification for gateway calls on or off (on by
+     * default). Only switch it off on a host that cannot validate the
+     * certificate because its CA bundle is outdated.
+     */
+    public function setSslVerification(bool $enabled): void
+    {
+        $this->sslVerify = $enabled;
+    }
 
     /**
      * Get last request sent to API
@@ -347,8 +364,13 @@ class DNARest
     {
         $this->paceZoneRequest($endpoint);
 
+        // Durations are per call. Measuring from construction made every call
+        // after the first second of a long-lived client (cron, sync) look slow.
+        $this->startAt = microtime(true);
+
         $parsedResponse     = [];
-        $this->lastFunction = __FUNCTION__ . ':' . $method . ' ' . $endpoint;
+        // Query strings (e.g. ?domainName=…) stay out of the operation name.
+        $this->lastFunction = __FUNCTION__ . ':' . $method . ' ' . strtok((string) $endpoint, '?');
 
         $url = $this->serviceUrl . '/' . ltrim($endpoint, '/');
 
@@ -359,10 +381,9 @@ class DNARest
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
         curl_setopt($ch, CURLOPT_TIMEOUT, self::$DEFAULT_TIMEOUT);
-
-        //ignore ssl
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, self::$DEFAULT_CONNECT_TIMEOUT);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->sslVerify);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->sslVerify ? 2 : 0);
 
 
         $headers = [
@@ -392,20 +413,22 @@ class DNARest
         // Debug output removed to avoid breaking consumers
 
         if (curl_errno($ch)) {
-            // Transport failure (timeout, "Could not resolve host", reset).
-            // Do NOT throw: surface it the same way a bad/empty HTTP response
-            // does. Populate lastParsedResponse via setError() (mirroring the
-            // HTTP-error branch) and leave the body empty, so the caller's
-            // normal empty-response handling turns it into a RESULT_ERROR
-            // instead of an uncaught exception. Still reported to Sentry.
+            // Transport failure (timeout, "Could not resolve host", TLS,
+            // reset). Throw: an empty body is not a success, and every public
+            // method catches this and returns RESULT_ERROR. Returning [] here
+            // made write calls (nameservers, lock, contacts…) report success
+            // while nothing reached the registry.
             $curlErrno    = curl_errno($ch);
             $errorMessage = 'Curl error during request: ' . curl_error($ch);
+            if ($curlErrno === 28) {
+                $errorMessage = 'Could not reach the DomainNameAPI service: the connection timed out. (' . curl_error($ch) . ')';
+            }
             curl_close($ch);
 
             $this->lastParsedResponse = $this->setError('CURL_' . $curlErrno, $errorMessage, $errorMessage);
-            $this->sendErrorToSentryAsync(new Exception($errorMessage, $curlErrno));
-            // $parsedResponse stays [] — consumers map an empty body to the
-            // standard "RESPONSE" error, identical to a real empty response.
+            $error = new Exception($errorMessage, $curlErrno);
+            $this->sendErrorToSentryAsync($error);
+            throw $error;
         }
         else {
             curl_close($ch);

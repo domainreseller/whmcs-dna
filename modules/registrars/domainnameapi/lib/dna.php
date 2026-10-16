@@ -13,7 +13,7 @@
  * a Reseller ID (UUID) and an API Key.
  *
  * @package DomainNameApi
- * @version 4.0.0
+ * @version 4.0.1
  */
 
 namespace DomainNameApi;
@@ -336,5 +336,13 @@ class DomainNameAPI_PHPLibrary
     public function setErrorReportingEnabled(bool $enabled): void
     {
         $this->client->setErrorReportingEnabled($enabled);
+    }
+
+    /**
+     * Turn TLS certificate verification for gateway calls on or off (on by default).
+     */
+    public function setSslVerification(bool $enabled): void
+    {
+        $this->client->setSslVerification($enabled);
     }
 }
