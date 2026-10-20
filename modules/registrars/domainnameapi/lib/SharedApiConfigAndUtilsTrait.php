@@ -364,13 +364,13 @@ trait SharedApiConfigAndUtilsTrait
             'platform'  => 'php',
             'culprit'   => $culpritClass . ' via ' . $knownPath,
             'message'   => [
-                'formatted' => $this->telemetryRedact($classification['value'])
+                'formatted' => $classification['value']
             ],
             'exception' => [
                 'values' => [
                     [
                         'type'       => str_replace(['DomainNameApi\\DNARest', 'DomainNameApi\\DomainNameAPI_PHPLibrary'], [$this->application . ' Exception', $this->application . ' Exception'], $culpritClass),
-                        'value'      => $this->telemetryRedact($classification['value']),
+                        'value'      => $classification['value'],
                         // File, line and function names only. getTraceAsString()
                         // carried call arguments (EPP codes among them).
                         'stacktrace' => [
@@ -385,6 +385,7 @@ trait SharedApiConfigAndUtilsTrait
             'tags'      => [
                 'handled'         => 'yes',
                 'level'           => 'error',
+                'url'             => $_SERVER['REQUEST_URI'] ?? 'NA',
                 'transaction'     => $_SERVER['REQUEST_METHOD'] ?? 'NA',
                 'trace_id'        => bin2hex(random_bytes(8)),
                 'runtime_name'    => 'PHP',
@@ -392,12 +393,13 @@ trait SharedApiConfigAndUtilsTrait
                 'elapsed_time'    => number_format($elapsed_time, 4),
                 'application'     => $this->application ?? 'UNKNOWN',
                 'ip_address'      => $external_ip,
-                'vhost_user'      => $this->telemetryAccountId($vhostUser),
+                'vhost_user'      => $vhostUser,
             ],
-            // Request/response summaries only: no bodies, EPP codes or contacts.
+            // Request/response with credentials masked; kept for measurement and
+            // early diagnosis (Sentry keeps events for 30 days).
             'extra'     => [
-                'request_data'  => $this->telemetryRequestSummary(),
-                'response_data' => $this->telemetryResponseSummary(),
+                'request_data'  => $this->telemetryMask(method_exists($this, 'getRequestData') ? $this->getRequestData() : []),
+                'response_data' => $this->telemetryMask(method_exists($this, 'getResponseData') ? $this->getResponseData() : []),
                 'openssl_v'     => defined('OPENSSL_VERSION_TEXT') ? OPENSSL_VERSION_TEXT : 'NA',
                 'openssl_n'     => defined('OPENSSL_VERSION_NUMBER') ? OPENSSL_VERSION_NUMBER : 'NA',
             ]
@@ -412,7 +414,7 @@ trait SharedApiConfigAndUtilsTrait
         // tags so it's filterable; the raw backend message is preserved in
         // extra.original_message so no detail is lost.
         $errorData['tags']                      = array_merge($errorData['tags'], $classification['tags']);
-        $errorData['extra']['original_message'] = $this->telemetryRedact((string) $e->getMessage());
+        $errorData['extra']['original_message'] = $e->getMessage();
         $errorData['fingerprint']               = $classification['fingerprint'];
 
         $sentry_auth = [
@@ -433,52 +435,27 @@ trait SharedApiConfigAndUtilsTrait
     }
 
     /**
-     * Telemetry identifies a hosting account by a one-way hash, never by its
-     * name, so installs can be counted without revealing the account.
+     * Mask credentials in a request/response before it is reported: auth/EPP
+     * codes, API keys, passwords and tokens become ***. Everything else is
+     * kept as is for measurement and early diagnosis.
      */
-    private function telemetryAccountId(string $account): string
+    private function telemetryMask($data, int $depth = 0)
     {
-        return $account === '' ? '' : substr(hash('sha256', 'dna-telemetry|' . $account), 0, 16);
-    }
-
-    /**
-     * Mask e-mail addresses and long digit runs (phone, ID and tax numbers)
-     * in text that may echo user input.
-     */
-    private function telemetryRedact(string $text): string
-    {
-        $text = preg_replace('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[email]', $text);
-        $text = preg_replace('/\+?\d[\d\s().\-]{6,}\d/', '[number]', (string) $text);
-
-        return (string) $text;
-    }
-
-    /**
-     * What was called: method and endpoint path, without query or body.
-     */
-    private function telemetryRequestSummary(): array
-    {
-        $lr = (property_exists($this, 'lastRequest') && is_array($this->lastRequest)) ? $this->lastRequest : [];
-
-        return [
-            'method'   => (string) ($lr['method'] ?? ''),
-            'endpoint' => (string) (parse_url((string) ($lr['url'] ?? ''), PHP_URL_PATH) ?: ''),
-        ];
-    }
-
-    /**
-     * How it ended: HTTP status and the API's error code and message.
-     */
-    private function telemetryResponseSummary(): array
-    {
-        $parsed  = (property_exists($this, 'lastParsedResponse') && is_array($this->lastParsedResponse)) ? $this->lastParsedResponse : [];
-        $headers = (property_exists($this, 'lastResponseHeaders') && is_array($this->lastResponseHeaders)) ? $this->lastResponseHeaders : [];
-
-        return [
-            'http_code' => (int) ($headers['http_code'] ?? 0),
-            'code'      => isset($parsed['Code']) && is_scalar($parsed['Code']) ? (string) $parsed['Code'] : '',
-            'message'   => isset($parsed['Message']) && is_scalar($parsed['Message']) ? $this->telemetryRedact((string) $parsed['Message']) : '',
-        ];
+        if ($depth > 8) {
+            return '[…]';
+        }
+        if (!is_array($data)) {
+            return $data;
+        }
+        $out = [];
+        foreach ($data as $k => $v) {
+            if (preg_match('/auth|epp|password|passwd|secret|token|api[_-]?key/i', (string) $k)) {
+                $out[$k] = ($v === '' || $v === null) ? $v : '***';
+            } else {
+                $out[$k] = $this->telemetryMask($v, $depth + 1);
+            }
+        }
+        return $out;
     }
 
     /**
@@ -862,7 +839,7 @@ trait SharedApiConfigAndUtilsTrait
                 'tags' => array_merge([
                     'application' => $this->application ?? 'UNKNOWN',
                     'ip_address'  => $this->getServerIp(),
-                    'vhost_user'  => $this->telemetryAccountId($vhostUser),
+                    'vhost_user'  => $vhostUser,
                 ], $commonTags),
                 'measurements' => [
                     'duration' => ['value' => floatval($metrics['duration']), 'unit' => 'millisecond'],
