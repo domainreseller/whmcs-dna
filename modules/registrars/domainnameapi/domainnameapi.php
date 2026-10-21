@@ -2,7 +2,7 @@
 /**
  * Module WHMCS-DNA
  * @package DomainNameApi
- * @version 4.0.0
+ * @version 4.0.2
  */
 
 use \WHMCS\Domain\TopLevel\ImportItem;
@@ -20,7 +20,7 @@ new DomainNameApi\Services\Language();
 
 function domainnameapi_version(): string
 {
-    return '4.0.0';
+    return '4.0.2';
 }
 
 function domainnameapi_getConfigArray($params) {
