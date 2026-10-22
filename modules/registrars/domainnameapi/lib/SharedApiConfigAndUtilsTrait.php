@@ -9,7 +9,7 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '4.0.2'; // Must be identical in both classes; update here if changed
+    public static $VERSION = '4.0.3'; // Must be identical in both classes; update here if changed
 
     public static $PERFORMANCE_SAMPLE_RATE = 40; // 4% (40 out of 1000)
     public static $RESULT_OK      = 'OK';
@@ -224,6 +224,21 @@ trait SharedApiConfigAndUtilsTrait
     }
 
     /**
+     * Send only the error code and message, endpoint, timing, versions and
+     * reseller ID — no request/response data, domain, panel URL, hosting
+     * account name or server IP.
+     */
+    public function setTelemetryMinimal(bool $minimal): void
+    {
+        $this->telemetryMinimal = $minimal;
+    }
+
+    private function isTelemetryMinimal(): bool
+    {
+        return property_exists($this, 'telemetryMinimal') && $this->telemetryMinimal;
+    }
+
+    /**
      * Normalize a nameserver/host name coming from module UIs before it is
      * sent to the gateway: trim whitespace, drop the FQDN trailing dot,
      * lowercase. Registries treat "NS1.EXAMPLE.COM." and "ns1.example.com"
@@ -319,7 +334,7 @@ trait SharedApiConfigAndUtilsTrait
         $secret_key = $parsed_dsn['pass'] ?? null;
         $api_url    = "https://$host/api/$project_id/store/";
 
-        $external_ip = $this->getServerIp();
+        $external_ip = $this->isTelemetryMinimal() ? '' : $this->getServerIp();
 
         $knownPath = __FILE__; // This will be the trait's file path
         $errFile   = $e->getFile();
@@ -416,6 +431,27 @@ trait SharedApiConfigAndUtilsTrait
         $errorData['tags']                      = array_merge($errorData['tags'], $classification['tags']);
         $errorData['extra']['original_message'] = $e->getMessage();
         $errorData['fingerprint']               = $classification['fingerprint'];
+
+        if ($this->isTelemetryMinimal()) {
+            unset($errorData['tags']['url'], $errorData['tags']['ip_address'], $errorData['tags']['vhost_user'], $errorData['tags']['ip_value']);
+            $lr = (property_exists($this, 'lastRequest') && is_array($this->lastRequest)) ? $this->lastRequest : [];
+            $errorData['extra']['request_data']  = [
+                'method'   => (string) ($lr['method'] ?? ''),
+                'endpoint' => (string) (parse_url((string) ($lr['url'] ?? ''), PHP_URL_PATH) ?: ''),
+            ];
+            $errorData['extra']['response_data'] = [
+                'http_code' => (int) (($this->lastResponseHeaders ?? [])['http_code'] ?? 0),
+            ];
+            // File names only: an absolute path would carry the hosting account (/home/<user>/).
+            $errorData['culprit'] = $culpritClass . ' via ' . basename($knownPath);
+            foreach ($errorData['exception']['values'] as &$value) {
+                foreach ($value['stacktrace']['frames'] as &$frame) {
+                    $frame['filename'] = basename((string) $frame['filename']);
+                }
+                unset($frame);
+            }
+            unset($value);
+        }
 
         $sentry_auth = [
             'sentry_version=7',
@@ -540,7 +576,7 @@ trait SharedApiConfigAndUtilsTrait
         $lr = (property_exists($this, 'lastRequest') && is_array($this->lastRequest))
             ? $this->lastRequest : [];
         $domain = $lr['payload']['domainName'] ?? null;
-        if (!empty($domain) && is_string($domain)) {
+        if (!empty($domain) && is_string($domain) && !$this->isTelemetryMinimal()) {
             $tags['domain'] = $domain;
         }
 
@@ -785,7 +821,7 @@ trait SharedApiConfigAndUtilsTrait
             if ($callHost !== '') {
                 $spanData['server.address'] = $callHost;
             }
-            if ($callUrl !== '') {
+            if ($callUrl !== '' && !$this->isTelemetryMinimal()) {
                 $spanData['url.full'] = strtok($callUrl, '?');
             }
             if (isset($commonTags['status_code'])) {
@@ -838,8 +874,8 @@ trait SharedApiConfigAndUtilsTrait
                 // are surfaced as tags so they're filterable in Performance.
                 'tags' => array_merge([
                     'application' => $this->application ?? 'UNKNOWN',
-                    'ip_address'  => $this->getServerIp(),
-                    'vhost_user'  => $vhostUser,
+                    'ip_address'  => $this->isTelemetryMinimal() ? '' : $this->getServerIp(),
+                    'vhost_user'  => $this->isTelemetryMinimal() ? '' : $vhostUser,
                 ], $commonTags),
                 'measurements' => [
                     'duration' => ['value' => floatval($metrics['duration']), 'unit' => 'millisecond'],

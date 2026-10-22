@@ -13,7 +13,7 @@
  * a Reseller ID (UUID) and an API Key.
  *
  * @package DomainNameApi
- * @version 4.0.2
+ * @version 4.0.3
  */
 
 namespace DomainNameApi;
@@ -336,6 +336,15 @@ class DomainNameAPI_PHPLibrary
     public function setErrorReportingEnabled(bool $enabled): void
     {
         $this->client->setErrorReportingEnabled($enabled);
+    }
+
+    /**
+     * Minimal telemetry: only error code/message, endpoint, timing, versions
+     * and reseller ID are reported.
+     */
+    public function setTelemetryMinimal(bool $minimal): void
+    {
+        $this->client->setTelemetryMinimal($minimal);
     }
 
     /**

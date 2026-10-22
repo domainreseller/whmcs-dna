@@ -23,6 +23,13 @@ class DNARest
     private bool $errorReportingEnabled = true;
 
     /**
+     * Minimal telemetry: reports carry only the error code and message,
+     * endpoint, timing, versions and reseller ID — no request/response data,
+     * domain, panel URL, account name or server IP (no IP lookup is made).
+     */
+    private bool $telemetryMinimal = false;
+
+    /**
      * Verify the gateway's TLS certificate. Leave on; switch off with
      * setSslVerification(false) only on a host whose CA bundle is too old to
      * validate the certificate.
