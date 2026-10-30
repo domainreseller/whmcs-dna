@@ -47,6 +47,13 @@ class DomainNameAPI_PHPLibrary
         $resellerId = trim((string) $resellerId);
         $apiKey     = trim((string) $apiKey);
 
+        // Panels store checkbox settings as strings; a non-empty "false"/"off"
+        // is truthy in PHP and would silently route live keys to OTE (BUG-10284).
+        if (is_string($testmode)) {
+            $testmode = filter_var(trim($testmode), FILTER_VALIDATE_BOOLEAN);
+        }
+        $testmode = (bool) $testmode;
+
         $this->client = new DNARest($resellerId, $apiKey, $testmode);
     }
 
