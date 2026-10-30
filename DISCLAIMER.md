@@ -4,7 +4,7 @@
 
 *For the Use of DomainNameAPI*
 
-This disclaimer and waiver of liability ("Disclaimer") contains important provisions to consider when using the DomainNameAPI module "Currency Conversation Tool". DomainNameAPI Module conversation tool utilizes a third-party API service located at "https://open.er-api.com/v6/latest/USD" for currency exchange rates and conversion operations. Please read this Disclaimer carefully and ensure that you understand its contents before using the DomainNameAPI module.
+This disclaimer and waiver of liability ("Disclaimer") contains important provisions to consider when using the DomainNameAPI module "Currency Conversation Tool". DomainNameAPI Module conversation tool utilizes a third-party API service located at "https://open.er-api.com/v6/latest/USD" (with "https://allratestoday.com/api/open/latest/USD", Exchange rates by [AllRatesToday](https://allratestoday.com), as a fallback) for currency exchange rates and conversion operations. Please read this Disclaimer carefully and ensure that you understand its contents before using the DomainNameAPI module.
 
 1. **Third-Party API Service:** DomainNameAPI uses a third-party API service for currency exchange rates and conversion operations. Due to the daily preparation of exchange rates and financial data by the API, there may be fluctuations and changes in prices.
 

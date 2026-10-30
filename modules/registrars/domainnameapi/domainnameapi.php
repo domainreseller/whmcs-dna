@@ -1747,19 +1747,29 @@ function domainnameapi_exchangerates() {
 
     $rates = domainnameapi_parse_cache('currency_data', 1800, function () {
 
-        $url = 'https://open.er-api.com/v6/latest/USD';
-        $ch  = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        $json = curl_exec($ch);
-        curl_close($ch);
-        $data = json_decode($json);
+        // Tried in order; both return the same {"rates": {...}} shape. The
+        // second (ECB reference rates, keyless) is only used when the first
+        // fails. Credit: "Exchange rates by AllRatesToday" https://allratestoday.com
+        $urls = [
+            'https://open.er-api.com/v6/latest/USD',
+            'https://allratestoday.com/api/open/latest/USD',
+        ];
 
-        if (!isset($data->rates)) {
-            throw new Exception('Error: Exchange service is not available . Please Wait few minutes and try again. ');
+        foreach ($urls as $url) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            $json = curl_exec($ch);
+            curl_close($ch);
+            $data = json_decode($json);
+
+            if (isset($data->rates->TRY)) {
+                return $data->rates;
+            }
         }
 
-        return $data->rates;
+        throw new Exception('Error: Exchange service is not available . Please Wait few minutes and try again. ');
     });
 
 
