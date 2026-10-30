@@ -13,7 +13,7 @@
  * a Reseller ID (UUID) and an API Key.
  *
  * @package DomainNameApi
- * @version 4.0.3
+ * @version 4.0.4
  */
 
 namespace DomainNameApi;

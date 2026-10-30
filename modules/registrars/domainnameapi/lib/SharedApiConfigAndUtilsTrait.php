@@ -9,7 +9,7 @@ trait SharedApiConfigAndUtilsTrait
     /**
      * Version of the library
      */
-    public static $VERSION = '4.0.3'; // Must be identical in both classes; update here if changed
+    public static $VERSION = '4.0.4'; // Must be identical in both classes; update here if changed
 
     public static $PERFORMANCE_SAMPLE_RATE = 40; // 4% (40 out of 1000)
     public static $RESULT_OK      = 'OK';
