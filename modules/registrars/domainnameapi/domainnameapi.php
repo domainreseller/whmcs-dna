@@ -1582,7 +1582,10 @@ function getDNAApi($params){
     $apiKey     = $params["API_Password"];
     $testmode   = $params["API_TestMode"];
 
-    return new \DomainNameApi\DomainNameAPI_PHPLibrary($resellerId,$apiKey,$testmode);
+    $api = new \DomainNameApi\DomainNameAPI_PHPLibrary($resellerId,$apiKey,$testmode);
+    if (method_exists($api, 'setClientInfo')) { $api->setClientInfo('whmcs', domainnameapi_version()); }
+
+    return $api;
 }
 
 function domainnameapi_parse_contact($params) {
