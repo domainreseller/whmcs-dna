@@ -85,6 +85,10 @@ class DNARest
 
     private string $serviceUrl          = self::URL_PROD;
     private string $application         = "CORE";
+    /** @var string sent as X-App: the integration that uses the library (lowercase) */
+    private string $clientApp           = 'php';
+    /** @var string sent as X-Version: the integration's version, digits and dots only */
+    private string $clientVersion       = '';
     public array   $lastRequest         = [];
     public array   $lastResponse        = [];
     public ?array  $lastResponseHeaders = [];
@@ -122,6 +126,43 @@ class DNARest
         $this->token      = $token;
     }
 
+
+    /**
+     * Identify the integration that uses the library. Every API request then
+     * carries the headers X-App (the application, lowercase, e.g. "wisecp")
+     * and X-Version (its version, digits and dots only, e.g. "2.0.20").
+     * Without this call the library sends X-App: php and its own version.
+     *
+     * @param string $app     Application name, e.g. "whmcs" or "WiseCP"
+     * @param string $version Application version, e.g. "V2.0.20" (sent as 2.0.20)
+     * @return DNARest
+     */
+    public function setClientInfo(string $app, string $version = '')
+    {
+        $app = preg_replace('/[^a-z0-9._-]/', '', strtolower(trim($app)));
+        $this->clientApp     = $app !== '' ? $app : 'php';
+        $this->clientVersion = self::normalizeClientVersion($version);
+        return $this;
+    }
+
+    /**
+     * The X-App and X-Version values sent with every request.
+     *
+     * @return array{app: string, version: string}
+     */
+    public function getClientInfo(): array
+    {
+        return [
+            'app'     => $this->clientApp,
+            'version' => $this->clientVersion !== '' ? $this->clientVersion : self::normalizeClientVersion(self::$VERSION),
+        ];
+    }
+
+    /** Keep only digits and dots: "V2.0.20-beta" becomes "2.0.20". */
+    private static function normalizeClientVersion(string $version): string
+    {
+        return trim(preg_replace('/[^0-9.]/', '', $version), '.');
+    }
 
     /**
      * Turn TLS certificate verification for gateway calls on or off (on by
@@ -401,11 +442,14 @@ class DNARest
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->sslVerify ? 2 : 0);
 
 
+        $clientInfo = $this->getClientInfo();
         $headers = [
             'Content-Type: application/json',
             'Accept: application/json',
             'X-API-KEY: ' . $this->token,  // Swagger uses X-API-KEY
-            '__reseller: ' . $this->resellerId  // Zorunlu header
+            '__reseller: ' . $this->resellerId,  // Zorunlu header
+            'X-App: ' . $clientInfo['app'],
+            'X-Version: ' . $clientInfo['version'],
         ];
 
         if (in_array($method, ['GET', 'DELETE'])) {

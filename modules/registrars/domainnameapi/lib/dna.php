@@ -355,6 +355,29 @@ class DomainNameAPI_PHPLibrary
     }
 
     /**
+     * Identify the integration that uses the library: every API request then
+     * carries X-App (lowercase application name) and X-Version (its version,
+     * digits and dots only). Without this call: X-App: php and the library version.
+     *
+     * Example: $api->setClientInfo('wisecp', '2.0.20');
+     */
+    public function setClientInfo(string $app, string $version = '')
+    {
+        $this->client->setClientInfo($app, $version);
+        return $this;
+    }
+
+    /**
+     * The X-App and X-Version values sent with every request.
+     *
+     * @return array{app: string, version: string}
+     */
+    public function getClientInfo(): array
+    {
+        return $this->client->getClientInfo();
+    }
+
+    /**
      * Turn TLS certificate verification for gateway calls on or off (on by default).
      */
     public function setSslVerification(bool $enabled): void
