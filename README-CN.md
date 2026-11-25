@@ -103,7 +103,6 @@ _**如果你是在升级，请在安装之前备份旧文件。**_
 <a href="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"><img width="400"  alt="image" src="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"></a>
 
 - 你可以发送 "删除请求" 以删除域名。
-- 你可以发送 "取消转移" 以取消域名转移。
 - 你可以查看域名的实时状态、即时启动和结束。
 - 你可以列出你的子域名。
 - 你可以查看额外的字段信息。

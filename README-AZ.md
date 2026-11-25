@@ -107,7 +107,6 @@ Daha ətraflı məlumat üçün : <a href="https://docs.whmcs.com/Registrar_TLD_
 <a href="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"><img width="400"  alt="image" src="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"></a>
 
 - Domen adı üçün "Silmə tələbi" göndərə bilərsiniz.
-- Domen adı üçün "Transfer İmtinası" göndərə bilərsiniz.
 - Domen adının canlı statusunu, anlık başlama və bitməsini görmək olar.
 - Sublarınızı siyahıya ala bilərsiniz.
 - Əlavə sahə məlumatlarını görə bilərsiniz.

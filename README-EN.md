@@ -106,7 +106,6 @@ For more information : <a href="https://docs.whmcs.com/Registrar_TLD_Sync">Whmcs
 <a href="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"><img width="400"  alt="image" src="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"></a>
 
 - You can send a "Deletion request" for the domain name.
-- You can send "Transfer Cancellation" for the domain name.
 - You can see the live status, instant start and end of the domain name
 - You can list your subs 
 - You can view additional field information 
@@ -167,7 +166,6 @@ For more information : <a href="https://docs.whmcs.com/Registrar_TLD_Sync">Whmcs
 | SubNameserver  | ✓    | ✓     | 
 | Availability   | ✓    | ✓     | 
 | PricingSnyc    | ✓    | ✓     | 
-| CancelTransfer | ✓    | ✓     | 
 | Sync           | ✓    | ✓     | 
 | TransferSync   | ✓    | ✓     | 
 
@@ -186,7 +184,6 @@ For more information : <a href="https://docs.whmcs.com/Registrar_TLD_Sync">Whmcs
 | SubNameserver  | ✓    | ✓     | 
 | Availability   | ✓    | ✓     | 
 | PricingSnyc    | ✓    | ✓     | 
-| CancelTransfer | ✓    | ✓     | 
 | Sync           | ✓    | ✓     | 
 | TransferSync   | ✓    | ✓     | 
 

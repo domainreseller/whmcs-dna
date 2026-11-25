@@ -106,7 +106,6 @@ Voor meer informatie: <a href="https://docs.whmcs.com/Registrar_TLD_Sync">Whmcs 
 <a href="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"><img width="400"  alt="afbeelding" src="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"></a>
 
 - U kunt een "Verwijderingsverzoek" sturen voor de domeinnaam.
-- U kunt een "Overdrachtsannulering" sturen voor de domeinnaam.
 - U kunt de live status zien, het directe begin en einde van de domeinnaam
 - U kunt uw subs op lijst zetten
 - U kunt aanvullende veldinformatie bekijken

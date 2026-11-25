@@ -104,7 +104,6 @@ Pour plus d'informations : <a href="https://docs.whmcs.com/Registrar_TLD_Sync">S
 <a href="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"><img width="400" alt="image" src="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"></a>
 
 - Vous pouvez envoyer une "Demande de suppression" pour le nom de domaine.
-- Vous pouvez envoyer une "Annulation de transfert" pour le nom de domaine.
 - Vous pouvez voir l'état en direct, le début et la fin instantanés du nom de domaine.
 - Vous pouvez répertorier vos sous-domaines.
 - Vous pouvez afficher des informations supplémentaires sur les champs.

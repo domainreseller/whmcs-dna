@@ -1422,38 +1422,6 @@ function domainnameapi_TransferSync($params) {
     return $values;
 }
 
-function domainnameapi_AdminCustomButtonArray() {
-    return [
-        "Cancel Transfer" => "canceltransfer",
-    ];
-}
-
-function domainnameapi_canceltransfer($params) {
-
-    $dna = getDNAApi($params);
-
-    $values=[];
-
-    $result = $dna->CancelTransfer($params["sld"] . "." . $params["tld"]);
-
-    if ($result["result"] == "OK") {
-        $values["message"] = "Successfully cancelled the domain transfer";
-    } else {
-        $values["error"] = $result["error"]["Message"] . " - " . $result["error"]["Details"];
-    }
-
-    // Log request
-    logModuleCall("domainnameapi",
-        substr(__FUNCTION__, 14),
-        $dna->getRequestData(),
-        $dna->getResponseData(),
-        $values
-    );
-
-    return $values;
-
-}
-
 function domainnameapi_AdminDomainsTabFields($params){
 
     $regs = Illuminate\Database\Capsule\Manager::table('tblregistrars')->where('registrar', 'domainnameapi')->get();

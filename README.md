@@ -105,7 +105,6 @@ Daha fazla bilgi için: <a href="https://docs.whmcs.com/Registrar_TLD_Sync">Whmc
 <a href="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"><img width="400"  alt="image" src="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"></a>
 
 - Alan adı için "Silme talebi" gönderebilirsiniz.
-- Alan adı için "Transfer İptali" gönderebilirsiniz.
 - Canlı durumu, anlık başlama ve bitişini görebilirsiniz.
 - Alt domainlerinizi listeleyebilirsiniz.
 - Ek alan bilgilerini görüntüleyebilirsiniz.
@@ -166,7 +165,6 @@ Daha fazla bilgi için: <a href="https://docs.whmcs.com/Registrar_TLD_Sync">Whmc
 | Alt Ad Sunucusu | ✓    | ✓     | 
 | Kullanılabilirlik | ✓  | ✓     | 
 | Fiyatlandırma Senkronizasyonu | ✓ | ✓ |
-| Transfer İptali | ✓    | ✓     | 
 | Senkronize      | ✓    | ✓     | 
 | Transfer Senkronizasyonu | ✓ | ✓ |
 
