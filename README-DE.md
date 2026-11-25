@@ -101,7 +101,6 @@ Weitere Informationen finden Sie unter: <a href="https://docs.whmcs.com/Registra
 <a href="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"><img width="400" alt="image" src="https://user-images.githubusercontent.com/3975986/209735794-6f2d6dbe-c4e2-463c-b768-1d79fe3b6d81.png"></a>
 
 - Sie können eine "Löschungsanfrage" für den Domainnamen senden.
-- Sie können eine "Transferstornierung" für den Domainnamen senden.
 - Sie können den aktuellen Status, den sofortigen Start und das Ende des Domainnamens anzeigen.
 - Sie können Ihre Subdomains auflisten.
 - Sie können zusätzliche Feldinformationen anzeigen.
