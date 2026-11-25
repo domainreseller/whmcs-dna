@@ -13,7 +13,7 @@
  * a Reseller ID (UUID) and an API Key.
  *
  * @package DomainNameApi
- * @version 4.0.6
+ * @version 4.0.7
  */
 
 namespace DomainNameApi;
@@ -274,21 +274,6 @@ class DomainNameAPI_PHPLibrary
      * @see DNARest::transfer()
      */
     public function transfer($domainName, $eppCode, $period) { return $this->client->transfer($domainName, $eppCode, $period); }
-
-    /**
-     * @see DNARest::cancelTransfer()
-     */
-    public function cancelTransfer($domainName) { return $this->client->cancelTransfer($domainName); }
-
-    /**
-     * @see DNARest::approveTransfer()
-     */
-    public function approveTransfer($domainName) { return $this->client->approveTransfer($domainName); }
-
-    /**
-     * @see DNARest::rejectTransfer()
-     */
-    public function rejectTransfer($domainName) { return $this->client->rejectTransfer($domainName); }
 
     /**
      * @see DNARest::renew()
